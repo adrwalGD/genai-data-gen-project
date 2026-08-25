@@ -19,7 +19,7 @@ from typing import Any
 
 import sqlglot
 from sqlglot import exp
-from sqlglot.errors import ParseError
+from sqlglot.errors import SqlglotError
 
 from .models import CheckConstraint, Column, ColumnType, ForeignKey, Schema, Table, UniqueConstraint
 
@@ -89,23 +89,25 @@ def parse_ddl(text: str, dialect: str | None = None) -> Schema:
     """
     if not text or not text.strip():
         raise DDLParseError("DDL is empty — upload a .sql/.ddl file with CREATE TABLE statements")
-    statements, used = _parse_statements(text, dialect)
+    statements, used, notes = _parse_statements(text, dialect)
     builder = _SchemaBuilder(used)
+    builder.notes.extend(notes)
     for stmt in statements:
         builder.consume(stmt)
     return builder.build()
 
 
-def _parse_statements(text: str, dialect: str | None) -> tuple[list[exp.Expression], str]:
-    """Parse with the given dialect, else MySQL then PostgreSQL; return statements + dialect used."""
+def _parse_statements(text: str, dialect: str | None) -> tuple[list[exp.Expression], str, list[str]]:
+    """Parse with the given dialect, else MySQL then PostgreSQL; return statements, dialect used, notes."""
     errors: list[str] = []
     for d in (dialect,) if dialect else DIALECTS:
         try:
             parsed = sqlglot.parse(text, read=d)
-        except ParseError as e:
+        except SqlglotError as e:  # ParseError and TokenError alike
             errors.append(f"[{d}] {_first_line(str(e))}")
             continue
-        return [s for s in parsed if isinstance(s, exp.Expression)], d
+        notes = [f"parsed as {d} after {err} — check the DDL if that is unexpected" for err in errors]
+        return [s for s in parsed if isinstance(s, exp.Expression)], d, notes
     raise DDLParseError("Could not parse DDL — " + "; ".join(errors))
 
 
@@ -118,7 +120,7 @@ class _SchemaBuilder:
         self.dialect = dialect
         self.tables: list[Table] = []
         self.ignored: list[str] = []
-        self.deferred_fks: list[tuple[str, ForeignKey]] = []
+        self.notes: list[str] = []
 
     # -- statements ------------------------------------------------------------------------------------------
     def consume(self, stmt: exp.Expression) -> None:

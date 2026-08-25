@@ -1,7 +1,8 @@
+name: genai-data-gen
+
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: datagen-postgres
     environment:
       POSTGRES_USER: datagen
       POSTGRES_PASSWORD: datagen
@@ -19,7 +20,6 @@ services:
   app:
     profiles: ["app"]
     build: .
-    container_name: datagen-app
     ports:
       - "${APP_PORT:-8501}:8501"
     env_file:

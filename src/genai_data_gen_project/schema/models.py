@@ -148,6 +148,9 @@ class Schema(BaseModel):
     ignored_statements: list[str] = Field(
         default_factory=list, description="Skipped non-table statements (e.g. CREATE INDEX, USE, SET)"
     )
+    notes: list[str] = Field(
+        default_factory=list, description="Warnings worth showing: dialect fallback, unknown types"
+    )
 
     @property
     def table_names(self) -> list[str]:

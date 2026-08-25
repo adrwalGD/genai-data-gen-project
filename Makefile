@@ -10,7 +10,7 @@ PYTEST_K := $(if $(K),-k "$(K)",)
 E2E_ARGS ?= --schema all --rows 1000
 
 .PHONY: help setup env lint fmt typecheck arch-check test test-ui test-int test-llm check check-all features \
-        db-up db-down db-reset db-shell check-env run e2e e2e-llm docker-up docker-down exit-check
+        db-up db-down db-reset db-shell db-clean check-env run e2e e2e-llm docker-up docker-down exit-check
 
 help: ## list targets
 > @grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n", $$1, $$2}'
@@ -69,6 +69,9 @@ db-reset: ## stop and delete the database volume
 
 db-shell: ## psql into the dev database
 > $(COMPOSE) exec postgres psql -U datagen -d datagen
+
+db-clean: ## drop leftover test_* schemas from interrupted integration runs
+> $(COMPOSE) exec -T postgres psql -U datagen -d datagen -Atc "select 'drop schema \"'||nspname||'\" cascade;' from pg_namespace where nspname like 'test\\_%'" | $(COMPOSE) exec -T postgres psql -U datagen -d datagen
 
 check-env: ## verify ADC→Vertex, Langfuse, Postgres with actionable messages
 > $(PY) scripts/check_env.py
