@@ -127,10 +127,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F3.2 — LLM planner merges over heuristics
 - milestone: M3
-- state: not_started
+- state: passing
 - behavior: `generation.planner.plan_with_llm(schema, instructions, rows_per_table, llm)` asks for a `GenerationPlan` via structured output and merges it over the heuristic plan (LLM may change strategies, ranges, enum weights, null ratios, per-table row counts, text-pool briefs); invalid LLM suggestions are dropped with a logged reason, never crash; instructions like "salaries 50k–90k, only Polish cities" are reflected in the plan.
 - verification: `make test K=planner && make test-llm K=planner`
-- evidence: —
+- evidence: make test K=planner → 3 passed (13 canned overrides: 5 valid applied incl. decimal range/enum weights/text pool/date window/row count, 8 invalid dropped with reasons — PK/FK protection, enum subset, NOT NULL null_ratio, type mismatch, unknown column/provider, missing params; merged plan expands + validates clean; prompt contents; datetime/null_ratio/boolean/pattern overrides); make test-llm K=planner → 1 passed (Gemini: salaries 50k–90k reflected in Employees.salary decimal_range, ≥2 overrides applied, plan validates, generated salaries within range); make check green (2026-08-25)
 
 ### F3.3 — LLM text pools with parallel batches and deduplication
 - milestone: M3
