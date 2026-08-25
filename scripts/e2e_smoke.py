@@ -48,6 +48,7 @@ def run_one(
     print(f"\n=== {name}: {ddl_path.name} — {rows} rows/table, seed {seed}, {mode} ===")
     started = time.perf_counter()
     timings: dict[str, float] = {}
+    engine_timings: dict[str, float] = {}
     root: Path | None = None
     dataset: Dataset | None = None
 
@@ -74,7 +75,7 @@ def run_one(
         except LLMError as e:
             raise StageFailed("llm", f"{e}") from e
         stage("generate")
-        timings.update({f"engine.{k}": v for k, v in dataset.params.get("timings_s", {}).items()})
+        engine_timings.update(dict(dataset.params.get("timings_s", {})))
         for note in dataset.params.get("notes", []):
             print(f"  note: {note}")
         report = engine.report_of(dataset)
@@ -115,6 +116,7 @@ def run_one(
         print(
             "  timings: " + ", ".join(f"{k} {v:.1f}s" for k, v in timings.items()) + f" · total {total:.1f}s"
         )
+        print("  engine:  " + ", ".join(f"{k} {v:.1f}s" for k, v in engine_timings.items()))
         print(f"OK   {name}: {dataset.total_rows} rows across {len(schema.tables)} tables")
         return True
     except StageFailed as e:

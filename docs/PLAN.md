@@ -10,7 +10,7 @@ system so that the professor demo can be given from any closed milestone onward.
 | M0 | Initialization | Lecture 6: infrastructure before features. Everything later relies on `make check`. | `make setup && make check && make db-up && make test-int && make check-env` all green from a clean clone |
 | M1 | Schema engine | DDL → IR is the foundation of both generation and Postgres loading. Pure Python, offline. | `make check && make db-up && make test-int` (all 3 sample schemas create in Postgres) |
 | M2 | Deterministic generation core | Proves integrity for 1000 rows/table before any LLM cost. Offline E2E. | `make e2e` (3 schemas × 1000 rows → validator clean → loaded with FKs) |
-| M3 | LLM-powered generation | Adds realism + user instructions + temperature on top of a proven core. | `make test-llm K=generation` + `make e2e-llm` + Langfuse trace id recorded |
+| M3 | LLM-powered generation | Adds realism + user instructions + temperature on top of a proven core. | `make check && make test-llm && make e2e-llm E2E_ARGS="--schema restaurants --rows 200"` + Langfuse trace id recorded |
 | M4 | Feedback edits | Spec: "modify the data through textual feedback". Needs M3 planner types. | `make test K=feedback` + `make test-llm K=feedback` (3 feedback styles) |
 | M5 | UI — Data Generation tab | First visible deliverable; wires M1–M4. Dockerized run. | `make test-ui` + `make docker-up` → `curl :8501/_stcore/health` = ok + manual run notes |
 | M6 | UI — Talk to your data | Phases 2–3: NL → SQL (function calling), tables, plots, streaming, traces. | `make test K=chat` + `make test-llm K=chat` + `make test-ui` |

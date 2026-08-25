@@ -217,7 +217,7 @@ def _apply_override(plan: GenerationPlan, ov: ColumnOverride, schema: Schema) ->
     trial = cp.model_copy(deep=True)
     if ov.kind != "null_ratio_only":
         try:
-            trial.recipe = _to_recipe(ov, col.scale)
+            trial.recipe = _to_recipe(_inherit_dates(ov, current), col.scale)
         except (ValueError, TypeError) as e:  # pydantic validation or date parsing
             return f"invalid parameters: {str(e).splitlines()[0][:120]}"
     if ov.null_ratio is not None:
@@ -234,6 +234,34 @@ def _apply_override(plan: GenerationPlan, ov: ColumnOverride, schema: Schema) ->
         cp.recipe, cp.null_ratio, cp.rationale = original.recipe, original.null_ratio, original.rationale
         return "; ".join(p.split(": ", 1)[1] for p in problems)
     return None
+
+
+def _inherit_dates(ov: ColumnOverride, current: ColumnRecipe) -> ColumnOverride:
+    """A date/datetime override that only tweaks nullability/gaps keeps the current window and anchor."""
+    if ov.kind not in {"date_window", "datetime_window"}:
+        return ov
+    if not isinstance(current, DateWindowRecipe | DateTimeWindowRecipe):
+        return ov
+    updates: dict[str, object] = {}
+    if ov.start is None:
+        updates["start"] = current.start.isoformat()
+    if ov.end is None:
+        updates["end"] = current.end.isoformat()
+    if ov.after_column is None and current.after_column:
+        updates["after_column"] = current.after_column
+    if ov.min_days_after is None:
+        gap = (
+            current.min_days_after if isinstance(current, DateWindowRecipe) else current.min_hours_after // 24
+        )
+        updates["min_days_after"] = gap
+    if ov.max_days_after is None:
+        gap_max = (
+            current.max_days_after
+            if isinstance(current, DateWindowRecipe)
+            else (None if current.max_hours_after is None else current.max_hours_after // 24)
+        )
+        updates["max_days_after"] = gap_max
+    return ov.model_copy(update=updates)
 
 
 def _to_recipe(ov: ColumnOverride, column_scale: int | None) -> ColumnRecipe:
