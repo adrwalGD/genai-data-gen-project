@@ -67,7 +67,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F1.4 — Compact schema summary for prompts
 - milestone: M1
-- state: not_started
+- state: active
 - behavior: `schema.summary.schema_summary(schema)` renders tables, columns, types, PK/FK/UNIQUE/CHECK/ENUM/NULL info in ≤ 25 lines per table; the library schema summary is under 6,000 characters.
 - verification: `make test K=summary`
 - evidence: —
