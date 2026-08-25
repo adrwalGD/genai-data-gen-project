@@ -1,9 +1,10 @@
 # Streamlit UI conventions
 
 - Entry: `src/genai_data_gen_project/ui/app.py` → `st.set_page_config(page_title="Data Assistant", layout="wide")`,
-  `st.navigation([st.Page(data_generation, title="Data Generation", icon=":material/database:"),
-  st.Page(talk_to_data, title="Talk to your data", icon=":material/forum:")])` rendered in the sidebar with the title
-  "Data Assistant" (matches `project-spec/sample-ui.png`).
+  `st.navigation([st.Page("pages/data_generation.py", title="Data Generation", icon=":material/database:"),
+  st.Page("pages/talk_to_data.py", title="Talk to your data", icon=":material/forum:")])` rendered in the sidebar with
+  the title "Data Assistant" (matches `project-spec/sample-ui.png`). Pages are *script files* (not functions) so
+  `AppTest.switch_page("pages/talk_to_data.py")` can drive them.
 - Pages contain layout + event handling only; they call `generation.engine`, `generation.feedback`, `storage.datasets`,
   `chat.agent`. No `google.genai`, `psycopg`, `sqlglot`, `langfuse` imports in `ui/` (`make arch-check`).
 - Session state keys are constants in `ui/state.py` (`SS_DDL_TEXT`, `SS_DATASET`, `SS_SELECTED_TABLE`, `SS_CHAT`,

@@ -173,14 +173,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F5.1 — App shell with sidebar navigation
 - milestone: M5
-- state: active
+- state: passing
 - behavior: `streamlit run src/genai_data_gen_project/ui/app.py` shows title "Data Assistant", sidebar pages "Data Generation" and "Talk to your data" via `st.navigation`; both pages render without errors with empty state and no LLM/DB configured.
 - verification: `make test-ui K=shell`
-- evidence: —
+- evidence: make test-ui K=shell → 1 passed (AppTest: sidebar title 'Data Assistant', Data Generation header + Generate button, switch_page to Talk to your data header + empty-state info; no exceptions without LLM/DB); make check green (2026-08-25)
 
 ### F5.2 — Data Generation form, generation, and per-table preview
 - milestone: M5
-- state: not_started
+- state: active
 - behavior: page offers DDL file upload (.sql/.txt/.ddl), a sample-schema selector and a paste box; instructions text area; advanced params (temperature 0–2, rows per table, seed, "use LLM" toggle); clicking Generate runs the engine with progress in `st.status`, then shows a table selector + `st.dataframe` preview + validation summary; with the fake/offline backend the AppTest drives selector → Generate → preview.
 - verification: `make test-ui K=generation_page`
 - evidence: —

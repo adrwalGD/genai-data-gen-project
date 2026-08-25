@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M5 UI — Data Generation** — F5.1 active. M4 features passing (gate pending); M3 re-verification running. Gates M0, M1, M2: PASS.
+- Milestone: **M5 UI — Data Generation** — F5.1 passing, F5.2 active. M4 features passing (gate pending, will include the M3 re-check). Gates M0, M1, M2: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F5.1 (Streamlit app shell with sidebar navigation)
+- Active feature: F5.2 (Data Generation form, generation run, per-table preview)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -40,6 +40,7 @@ summary plus anything that does not fit a feature entry.
       derived + aggregate recomputation, revalidation, edit history).
 - [x] M4 F4.2 natural-language feedback → EditPlan with Gemini (flat draft model, corrective retry incl. dropped-filter
       guard, pool values from Gemini); 3 feedback styles verified live.
+- [x] M5 F5.1 Streamlit shell: st.navigation sidebar (Data Generation, Talk to your data), state.py, script pages, AppTest.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -51,7 +52,9 @@ summary plus anything that does not fit a feature entry.
   with raw InvalidOperation — now coerced/validated and dropped with a reason, and `_conform` raises ExpansionError;
   (2) text-pool GENERATIONs were orphan Langfuse traces — contextvars now copied into pool workers; (3) text_pool
   overrides dropped `unique`/fallback — inherited; (4) localization — `locale` on faker recipes + prompt rules;
-  (5) row counts uncapped — clamped to `MAX_ROWS_PER_TABLE`. Fixed in the follow-up commit; re-verification pending.
+  (5) row counts uncapped — clamped to `MAX_ROWS_PER_TABLE`. Re-verification on `3414453`: all five fixed; narrow FAIL for
+  a flaky 300-titles yield and one bad batch discarding a whole pool → fixed (batch isolation, over-request, 5x relative
+  row cap). Final M3 verdict is folded into the M4 gate run (budget: the org spend limit tripped once).
 - Remaining realism gap (offline mode only): Faker catch_phrase/bs names for pools; the LLM pools cover it when Gemini is on.
 - Lesson (2026-08-25, #2): commit `fd9bc71` claimed all M1-verifier fixes but an edit script had aborted midway and the
   chain kept going (exit code unchecked); completed honestly in the follow-up commit. Rule added to docs/loop.md.
@@ -70,8 +73,8 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. M5 UI: F5.1 app shell → F5.2 generation form/preview → F5.3 feedback → F5.4 download/save → F5.5 Docker.
-2. Record the M3 re-verification verdict; run the M4 gate verifier.
+1. M5 UI: F5.2 generation form/preview → F5.3 feedback → F5.4 download/save → F5.5 Docker.
+2. Run the M4 gate verifier (incl. M3 re-check: pools yield, batch isolation, row cap); record Gate M3/M4.
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)
