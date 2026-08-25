@@ -5,7 +5,7 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M6 Talk to your data** — F6.1–F6.5 passing; M6 gate verifier pending. M7 F7.1 active. Gates M0–M5: PASS.
+- Milestone: **M7 Hardening & presentation** — F7.1 active. Gates M0–M6: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
@@ -65,6 +65,12 @@ summary plus anything that does not fit a feature entry.
   with the arguments, GENERATIONs nested by the instrumentor, `flush()` per turn; trace id on the final/error event and
   `agent.last_trace_id`; UI caption "Langfuse trace: <id>". Live test tests/llm/test_trace.py checks the Langfuse API
   (trace e04f086b2d81c22612ae6678a1f08a57: session trace-test, span tool.run_sql, 3 GENERATIONs).
+- [x] **Gate M6: PASS** (independent verifier, worktree on 42082ce, 2026-08-25): `make check` green (205 unit + 12 AppTest);
+  `make test K='agent or tools or charts or sql_guard or readonly'` 38 passed; `make test-int` 18 passed; `make test-llm
+  K='agent or trace'` 3 passed (live Vertex + Langfuse); `make test-ui` 12 passed. Live guard probe: 36 adversarial SQL strings
+  — DML/DDL/COPY/pg_sleep/pg_read_file rejected by the guard, data-modifying CTEs and setval blocked by READ ONLY (25006);
+  timeout → 57014 hint; LIMIT capped to 501. Trace 0c9c51439dcc844bb16fab33a8ccb42b verified via API (session, tag, tool.run_sql
+  span, 3 GENERATIONs). 8 non-blocking findings → Known Issues / F7.2.
 
 ## In Progress
 - (none)
@@ -102,9 +108,29 @@ summary plus anything that does not fit a feature entry.
 - `scripts/` are linted but not type-checked by mypy (`packages = ["genai_data_gen_project"]`); acceptable for M0.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
+### M6 verifier findings (2026-08-25) — scheduled for F7.2 unless noted
+1. major `llm/client.py stream_text`: `generate_content_stream` is a generator, so the HTTP call happens at first `next()`
+   outside `_call` → a 429/5xx on the streamed final answer is neither retried nor turned into `LLMError`; the agent only
+   catches `LLMError` → raw traceback in the chat. Fix: iterate inside `_call`/classify_error; agent converts any exception.
+2. minor `storage/sql_guard.py`: data-modifying CTEs and `nextval/setval/lastval` pass the guard (READ ONLY blocks them,
+   verified 25006) — reject `exp.Insert|Update|Delete|Merge` anywhere in the tree + deny the sequence functions.
+3. minor `chat/tools.py dispatch`: `LoadError` (PostgreSQL down between page check and query) is not caught → raw traceback.
+4. minor `llm/client.py:329` hint string contains a `gemini-2.5-flash` literal; arch-check R3 regex misses it — derive from
+   `Settings.model_fields['gemini_model'].default` and tighten R3.
+5. nit `chat/agent.py _model_text` imports `google.genai.types` in chat/ — move a `model_content` helper into llm/client.py.
+6. nit `observability.traced`: `propagate_attributes(metadata=…)` on child spans leaks `arg_sql` to trace metadata — use
+   `update_current_span` for child-only attributes.
+7. nit `ui/pages/talk_to_data.py`: truncated-result caption not stored in history; error text rendered twice.
+8. nit: guard allows catalog/cross-schema reads (`pg_shadow`, other `ds_*`) — single-user demo; optional `tables ⊆ dataset`.
+10. cleanup: throwaway offline dataset `i6qedhs753oo` ("shot-offline", from the screenshot dry run) is still in the registry +
+    PostgreSQL; delete it before the demo (`datasets.delete` + `postgres.drop_dataset`). `hiclakim2uwr` = restaurants-demo (keep).
+9. found during F7.1: the Docker app runs as root, so the bind-mounted `data/datasets` became root-owned and a later local
+   `make run` save failed with `Permission denied` (fixed by chown). Fix in F7.2: non-root user (UID 1000) in the Dockerfile.
+
 ## Next Steps
-1. M6 gate verifier (fresh-context agent on the F6.5 commit) → record Gate M6.
-2. M7 hardening: F7.1 README + demo walkthrough (active) → F7.2 actionable errors/UX polish → F7.3 check-all + demo dataset + v1.0 tag.
+1. F7.1 README + demo walkthrough (active): screenshots via headless Chrome, README-walkthrough verifier → pass.
+2. F7.2 actionable errors/UX polish incl. M6 findings 1–7 and 9 (Dockerfile non-root user) → `make test-ui K=errors`.
+3. F7.3 `make check-all`, demo dataset restaurants 1000 rows (LLM), rebuild Docker image, tag v1.0.
 
 ## Session log (newest first)
 - **2026-08-25 (session 1, cont.)** — M0 committed (`38572e8`); independent M0 gate verifier launched; F1.1 DDL
