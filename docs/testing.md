@@ -24,8 +24,8 @@
 - Test names read as behavior: `test_expander_fills_deferred_cyclic_fks_in_second_pass`.
 
 ## Evidence format (docs/features.md → evidence)
-`<command> → <key output line(s)>; commit <hash>[; langfuse trace <id>]`
-e.g. `make test K=parser → 18 passed in 1.2s; commit 3f9e2c1`
+`<command> → <key output line(s)>[; langfuse trace <id>]` — the commit message carries the feature id (`feat(schema): F1.1 …`), so the hash is recoverable via `git log --grep F1.1`.
+e.g. `make test K=parser → 16 passed in 0.29s; make check green`
 
 ## Error messages are for agents too (lecture 10)
 Failures thrown by scripts/tests must say what failed, why, and the fix: `"Postgres not reachable at

@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M0 Initialization — features F0.1–F0.5 passing**; independent gate verification pending (docs/loop.md).
-- Latest commit: `f51b475` (chore: M0 initialization — harness, scaffold, tooling)
+- Milestone: **M1 Schema engine** — F1.1 passing; M0 gate verification running (independent verifier).
+- Latest commit: `2fd12fb` (feat(schema): F1.1 DDL parser → IR)
 - `make check`: green (ruff, mypy 11 files, arch-check 7 rules, unit 5 passed, e2e 3 passed)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: none (next: F1.1 DDL parser → IR)
+- Active feature: F1.2 (generation order with cycle breaking)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.

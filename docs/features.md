@@ -46,14 +46,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F1.1 — DDL parser produces a complete IR for all sample schemas
 - milestone: M1
-- state: not_started
+- state: passing
 - behavior: `schema.parser.parse_ddl(text)` returns a `Schema` IR for `library_mgm`, `restrurants`, `company_employee` DDLs with every table/column, types (INT, VARCHAR(n), TEXT, DATE, DATETIME, DECIMAL(p,s), BOOLEAN, ENUM values), nullability (`NULL`/`NOT NULL`), defaults (`0`, `'Active'`, `CURRENT_TIMESTAMP`, `TRUE`), AUTO_INCREMENT, UNIQUE, CHECK expressions, inline + table-level + `ALTER TABLE ADD CONSTRAINT` foreign keys; raises `DDLParseError` with line context on garbage input.
 - verification: `make test K=parser`
-- evidence: —
+- evidence: make test K=parser → 16 passed, 5 deselected in 0.29s (3 sample schemas: tables/columns/types/nullability incl. DATE NULL/defaults/AUTO_INCREMENT/UNIQUE/CHECK/ENUM/inline+table+ALTER FKs; MySQL+Postgres variants; 9 actionable error cases); make check green (2026-08-25)
 
 ### F1.2 — Generation order with cycle breaking
 - milestone: M1
-- state: not_started
+- state: active
 - behavior: `schema.order.generation_order(schema)` returns tables so that every non-nullable FK target precedes its source; cycles (library: Branches↔Employees↔Departments) are broken at nullable FKs which are reported as `deferred_fks` to fill in a second pass; a cycle made only of NOT NULL FKs raises `UnsatisfiableSchemaError`.
 - verification: `make test K=order`
 - evidence: —
