@@ -6,7 +6,7 @@ summary plus anything that does not fit a feature entry.
 
 ## Current State
 - Milestone: **M2 Deterministic generation core — all features passing (F2.1–F2.6)**; M2 gate verification pending. Gates M0, M1: PASS.
-- Latest commit: `b644a94` (feat(storage): F2.5 Postgres loader)
+- Latest commit: `9b01563` (feat(e2e): F2.6 smoke — M2 features complete)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
 - Active feature: F3.1 (Gemini client wrapper)

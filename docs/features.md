@@ -120,10 +120,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F3.1 — Gemini client wrapper (structured, streaming, tools, retries, tracing)
 - milestone: M3
-- state: not_started
+- state: passing
 - behavior: `llm.client.GeminiClient` exposes `generate_structured(schema_or_model, prompt, *, temperature, system)`, `stream_text(...)`, `generate_with_tools(...)`; uses Vertex ADC, settings model, thinking budget default 0; retries 429/5xx with exponential backoff (max 5); enforces `max_concurrency`; every call appears in Langfuse as a GENERATION when tracing is enabled.
 - verification: `make test-llm K=client`
-- evidence: —
+- evidence: make test K=llm_client → 9 passed (parsed structured output + usage, validation retry, 429/503 backoff 1s/2s then success, 400 no retry, quota give-up after llm_max_retries, error hints 404/401/500, empty-text MAX_TOKENS error, stream + tool turn with AFC disabled, pro keeps thinking, FakeLLM protocol, concurrency gate); make test-llm K=client → 5 passed against Vertex gemini-2.5-flash (Pydantic structured, dynamic JSON schema nullable+enum, streaming, manual function-calling round trip answering 42, retired model → LLMError 404 with GEMINI_MODEL hint); make check green (2026-08-25)
 
 ### F3.2 — LLM planner merges over heuristics
 - milestone: M3
