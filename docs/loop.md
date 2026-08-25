@@ -17,7 +17,9 @@
 7. **Record**: update PROGRESS.md (Current State, Completed, Next Steps). Then loop.
 
 Never: start a second feature while one is `active`; mark `passing` from memory; refactor "while at it"; leave a
-failing `make check` for "next time"; silence a test to get green.
+failing `make check` for "next time"; silence a test to get green; pipe a gate command (`make check | tail`
+hides the exit code — redirect to a log and test `$?`, or use `set -euo pipefail`). `features.py pass` refuses
+unless `.harness/check.ok` (touched by a green `make check`) is newer than every source file.
 
 ## Definition of done (per feature)
 - Verification command executed in this session and green; L1–L3 green.

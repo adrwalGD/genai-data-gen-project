@@ -51,6 +51,7 @@ test-llm: ## real Gemini tests (needs ADC)
 > RUN_LLM_TESTS=1 $(UV) run pytest tests -q -x --timeout=900 -m llm $(PYTEST_K)
 
 check: lint typecheck arch-check test test-ui ## fast offline gate — run before every commit
+> @mkdir -p .harness && touch .harness/check.ok && echo "check: OK — marker .harness/check.ok refreshed"
 
 check-all: check test-int test-llm e2e ## full gate (DB + Vertex)
 

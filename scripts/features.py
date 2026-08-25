@@ -6,7 +6,7 @@ Usage:
   features.py next                                 active feature id, else first not_started, else "none"
   features.py validate                             enforce the rules; exit 1 on violation
   features.py activate ID                          not_started|blocked -> active (WIP = 1)
-  features.py pass ID --evidence "cmd → output; commit abc"   active -> passing (evidence mandatory)
+  features.py pass ID --evidence "cmd → output"   active -> passing (evidence + fresh `make check` marker)
   features.py set ID STATE [--evidence "..."]      explicit transition (block, or reopen passing -> active)
 
 Only the standard library is used so the script runs anywhere (`python3 scripts/features.py`).
@@ -15,13 +15,16 @@ Only the standard library is used so the script runs anywhere (`python3 scripts/
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FEATURES_FILE = ROOT / "docs" / "features.md"
+FEATURES_FILE = Path(os.environ.get("FEATURES_FILE") or ROOT / "docs" / "features.md")
+CHECK_MARKER = Path(os.environ.get("CHECK_MARKER") or ROOT / ".harness" / "check.ok")
+WATCHED = ("src", "tests", "scripts", "Makefile", "pyproject.toml")
 STATES = ("not_started", "active", "blocked", "passing")
 REQUIRED_FIELDS = ("milestone", "state", "behavior", "verification", "evidence")
 HEADER_RE = re.compile(r"^### (F\d+\.\d+) — (.+)$")
@@ -104,6 +107,31 @@ def validate(feats: list[Feature]) -> list[str]:
     return errors
 
 
+def check_marker_status() -> str | None:
+    """None when `make check` ran after the last source change; otherwise the reason it is not fresh."""
+    if not CHECK_MARKER.exists():
+        return f"no `make check` marker at {CHECK_MARKER} — run `make check` first"
+    marker_mtime = CHECK_MARKER.stat().st_mtime
+    newest: tuple[float, Path] | None = None
+    for name in WATCHED:
+        path = ROOT / name
+        if not path.exists():
+            continue
+        files = (
+            [path]
+            if path.is_file()
+            else [f for f in path.rglob("*") if f.is_file() and "__pycache__" not in f.parts]
+        )
+        for f in files:
+            mtime = f.stat().st_mtime
+            if newest is None or mtime > newest[0]:
+                newest = (mtime, f)
+    if newest is not None and newest[0] > marker_mtime + 1:
+        rel = newest[1].relative_to(ROOT)
+        return f"{rel} changed after the last `make check` — run `make check` again before marking passing"
+    return None
+
+
 def find(feats: list[Feature], fid: str) -> Feature:
     for f in feats:
         if f.id == fid:
@@ -165,6 +193,8 @@ def transition(
             sys.exit(f"error: {others[0]} is already active — finish or block it first (WIP = 1)")
     if new_state == "passing" and (evidence or feat.evidence) in EMPTY_EVIDENCE:
         sys.exit("error: --evidence is required to mark a feature passing")
+    if new_state == "passing" and (reason := check_marker_status()):
+        sys.exit(f"error: refusing to mark {fid} passing: {reason}")
     if feat.state == "passing" and new_state != "passing":
         print(
             f"warning: reopening {fid} from passing → {new_state}; record why in PROGRESS.md → Known Issues"

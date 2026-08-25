@@ -3,6 +3,15 @@
 Append-only log: what was decided, why, what was rejected, and the constraint it creates. New entries go on top.
 Reference an entry from code comments as `DECISIONS.md#YYYY-MM-DD-slug` when a choice looks odd out of context.
 
+## 2026-08-25: Pass-state gating is enforced mechanically by a `make check` marker
+- Incident: while closing F1.1 the agent ran `make check | tail`, the pipe hid mypy's non-zero exit, and the feature
+  was marked passing and committed with a red gate — exactly the "declared victory too early" failure (lecture 9).
+- Fix at the verification layer (lecture 1 diagnostic loop), not by "trying harder": `make check` now touches
+  `.harness/check.ok`; `scripts/features.py pass` refuses unless that marker is newer than every file under
+  `src/ tests/ scripts/ Makefile pyproject.toml`. Gate commands are never piped in scripts (`set -euo pipefail`,
+  or redirect to a log and test `$?`).
+- Rejected: relying on the agent to read exit codes; a pre-commit hook (would block WIP commits mid-feature).
+
 ## 2026-08-25: Model = `gemini-2.5-flash` with thinking disabled by default
 - Reason: the spec says "Gemini 2.0 Flash (or newer)"; `gemini-2.0-flash-001` returns 404 on the Vertex project
   (retired). `gemini-2.5-flash` is available, fast, and supports structured output, function calling and streaming.
