@@ -194,14 +194,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F5.4 — Download and save dataset for Talk-to-data
 - milestone: M5
-- state: active
+- state: passing
 - behavior: "Download CSV (table)" and "Download ZIP (all)" buttons serve the exports; "Save dataset" persists to `data/datasets/<id>` and loads into Postgres schema `ds_<id>`, then shows the dataset id; saved datasets are listed on the Talk-to-data page.
 - verification: `make test-ui K=save_dataset && make test-int K=loader`
-- evidence: —
+- evidence: make test-ui K=save_dataset → 1 passed (AppTest offline with an unreachable DATABASE_URL: Save dataset writes data/datasets/<id>/{manifest.json,tables/*.csv} with the typed name, shows the 'PostgreSQL is not available' warning, and Talk to your data lists 'acme demo · 7 tables · 84 rows'); make test-int K=save_dataset → 1 passed (save + load into PostgreSQL, is_loaded, registry listing); download CSV/ZIP buttons rendered from generation.export; make check green incl. full e2e run (settings cache cleared per test) (2026-08-25)
 
 ### F5.5 — Dockerized app + database
 - milestone: M5
-- state: not_started
+- state: active
 - behavior: `make docker-up` builds the image (python:3.14-slim + uv, ADC directory mounted read-only, `data/` volume) and starts postgres + app; `curl -fsS localhost:8501/_stcore/health` returns `ok`; the app can generate offline data and save it to the compose Postgres.
 - verification: `make docker-up && curl -fsS localhost:8501/_stcore/health`
 - evidence: —

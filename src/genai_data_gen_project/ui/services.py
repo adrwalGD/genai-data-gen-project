@@ -18,6 +18,7 @@ from genai_data_gen_project.generation.expander import ExpansionError
 from genai_data_gen_project.llm.client import LLMBackend, LLMError
 from genai_data_gen_project.schema.order import UnsatisfiableSchemaError
 from genai_data_gen_project.schema.parser import DDLParseError
+from genai_data_gen_project.storage import datasets, postgres
 from genai_data_gen_project.storage.dataset import Dataset
 from genai_data_gen_project.ui import state
 
@@ -121,3 +122,25 @@ def run_feedback(
         raise UIError(f"Applying the feedback failed while regenerating values: {e}") from e
     except LLMError as e:
         raise UIError(f"Gemini failed while interpreting the feedback: {e}") from e
+
+
+@dataclass
+class SaveOutcome:
+    dataset_id: str
+    path: Path
+    loaded: bool
+    row_counts: dict[str, int]
+    warning: str | None = None
+
+
+def save_dataset(dataset: Dataset, *, name: str | None = None, cfg: Settings | None = None) -> SaveOutcome:
+    """Persist to the filesystem registry, then load into PostgreSQL (a DB outage degrades to a warning)."""
+    cfg = cfg or get_settings()
+    if name and name.strip():
+        dataset.name = name.strip()
+    path = datasets.save(dataset, cfg.datasets_dir)
+    try:
+        result = postgres.load_dataset(dataset, cfg)
+    except postgres.LoadError as e:
+        return SaveOutcome(dataset.id, path, False, dataset.row_counts(), warning=str(e))
+    return SaveOutcome(dataset.id, path, True, result.row_counts)

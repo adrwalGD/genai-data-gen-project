@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from genai_data_gen_project.generation import engine
+from genai_data_gen_project.generation import engine, export
 from genai_data_gen_project.schema.parser import DDLParseError, parse_ddl
 from genai_data_gen_project.ui import services, state
 
@@ -178,6 +178,46 @@ if dataset is not None:
                 if entry["issues"]:
                     st.warning("\n".join(entry["issues"]))
                 st.json(entry["ops"], expanded=False)
+        # --- 5. download and save ---------------------------------------------------------------------------
+        st.markdown("**Download or save**")
+        save_cols = st.columns([1, 1, 2, 1])
+        save_cols[0].download_button(
+            f"Download CSV ({table_name})",
+            data=export.to_csv_bytes(dataset, table_name),
+            file_name=export.csv_filename(dataset, table_name),
+            mime="text/csv",
+            key="download_csv",
+            width="stretch",
+        )
+        save_cols[1].download_button(
+            "Download ZIP (all tables)",
+            data=export.to_zip_bytes(dataset),
+            file_name=export.zip_filename(dataset),
+            mime="application/zip",
+            key="download_zip",
+            width="stretch",
+        )
+        dataset_name = save_cols[2].text_input(
+            "Dataset name", value=dataset.name, key="dataset_name", label_visibility="collapsed"
+        )
+        if save_cols[3].button("Save dataset", key="save_dataset", width="stretch"):
+            try:
+                with st.spinner("Saving and loading into PostgreSQL…"):
+                    outcome = services.save_dataset(dataset, name=dataset_name)
+                st.session_state[state.SS_ACTIVE_DATASET_ID] = outcome.dataset_id
+                total = sum(outcome.row_counts.values())
+                if outcome.loaded:
+                    st.success(
+                        f"Saved dataset `{outcome.dataset_id}` ({total} rows) and loaded it into PostgreSQL "
+                        "— it is now available in Talk to your data."
+                    )
+                else:
+                    st.warning(
+                        f"Saved dataset `{outcome.dataset_id}` to disk, but PostgreSQL is not available: "
+                        f"{outcome.warning}"
+                    )
+            except OSError as e:
+                st.error(f"Could not save the dataset: {e}")
         notes = dataset.params.get("notes", [])
         if notes or st.session_state[state.SS_GENERATION_LOG]:
             with st.expander("Generation details"):

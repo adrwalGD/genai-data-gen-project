@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,16 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     for item in items:
         if "llm" in item.keywords and not run_llm:
             item.add_marker(skip_llm)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_settings() -> Iterator[None]:
+    """`get_settings()` is lru-cached process-wide; every test must see its own monkeypatched environment."""
+    from genai_data_gen_project.config import get_settings
+
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture(autouse=True)
