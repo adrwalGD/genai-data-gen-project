@@ -180,14 +180,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F5.2 — Data Generation form, generation, and per-table preview
 - milestone: M5
-- state: active
+- state: passing
 - behavior: page offers DDL file upload (.sql/.txt/.ddl), a sample-schema selector and a paste box; instructions text area; advanced params (temperature 0–2, rows per table, seed, "use LLM" toggle); clicking Generate runs the engine with progress in `st.status`, then shows a table selector + `st.dataframe` preview + validation summary; with the fake/offline backend the AppTest drives selector → Generate → preview.
 - verification: `make test-ui K=generation_page`
-- evidence: —
+- evidence: make test-ui K=generation_page → 2 passed (AppTest offline: Generate disabled without a schema; sample schema selectbox parses 7 tables; rows-per-table set to 25; Generate → dataset of 175 rows with success summary; table selectbox lists all tables and switching updates the preview dataframe; pasted DDL parse error shown and disables Generate, fixed DDL generates 5 rows); make check green (2026-08-25)
 
 ### F5.3 — Per-table textual feedback with Submit
 - milestone: M5
-- state: not_started
+- state: active
 - behavior: under the preview, a feedback text box + Submit applies an `EditPlan` to the selected table (LLM or fake backend), refreshes the preview and validation summary, and keeps an edit history visible.
 - verification: `make test-ui K=feedback_ui`
 - evidence: —
