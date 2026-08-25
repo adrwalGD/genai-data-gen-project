@@ -224,14 +224,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F6.3 — Chart specs to plotly figures
 - milestone: M6
-- state: active
+- state: passing
 - behavior: `chat.charts.ChartSpec` (bar/line/pie/scatter/histogram, x, y, color, title, agg) → `to_figure(spec, rows)` builds a plotly figure; invalid columns raise `ChartSpecError` with the available columns listed.
 - verification: `make test K=charts`
-- evidence: —
+- evidence: make test K=charts → bar/line/pie/scatter/histogram specs render plotly figures with titles; line charts sorted by x and Decimals converted to floats; ChartSpec.from_tool_args ignores unknown/empty fields and rejects unknown chart types; bad specs raise ChartSpecError listing the available columns (unknown x/color, missing y, non-numeric y); empty result → error; make check green (2026-08-25)
 
 ### F6.4 — Talk-to-data page
 - milestone: M6
-- state: not_started
+- state: active
 - behavior: page has a dataset selector (saved datasets), chat history (`st.chat_message`), `st.chat_input`, streamed answers (`st.write_stream`), result tables, plotly charts, a "Show SQL" expander per turn, and a clear-conversation button; with a fake agent the AppTest drives one question to a table + chart.
 - verification: `make test-ui K=talk_page`
 - evidence: —
