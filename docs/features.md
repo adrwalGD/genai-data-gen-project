@@ -76,10 +76,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F2.1 — Column recipes and offline heuristic planner
 - milestone: M2
-- state: not_started
+- state: passing
 - behavior: `generation.recipes` defines typed recipes (int/decimal range, sequence, enum weighted, faker provider, pattern, date/datetime window, text pool ref, fk, derived, constant) and `generation.heuristics.plan(schema, rows_per_table)` assigns a valid recipe to every column of the three sample schemas without an LLM (emails→email, `*_date`→date windows, `zip_code`→postcode, `price/salary`→decimal ranges, ENUM→weighted, FK→fk).
 - verification: `make test K=heuristics`
-- evidence: —
+- evidence: make test K=heuristics → 16 passed (plans for 3 sample schemas complete + validate_plan clean; PK→sequence, FK→fk incl. deferred manager_id, ENUM weighted, CHECK bounds → rating 1..5, isbn13 unique, email pattern from first/last name, due_date after loan_date 14–28d, death_date after birth with null_ratio 0.85, available_quantity derived, id-like columns without FK → 1..100; validate_plan negative cases; recipe invariants + JSON schema); make check green (2026-08-25)
 
 ### F2.2 — Row expander honors every constraint class
 - milestone: M2

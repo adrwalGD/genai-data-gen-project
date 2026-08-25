@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M1 Schema engine — all features passing (F1.1–F1.4)**; M1 gate verification pending. M0 gate: PASS.
-- Latest commit: `066f643` (feat(schema): F1.3 PostgreSQL DDL emitter)
+- Milestone: **M2 Deterministic generation core** — F2.1 active. M1 features passing (gate verification running). M0 gate: PASS.
+- Latest commit: `de4040a` (feat(schema): F1.4 schema summary — M1 features complete)
 - `make check`: green (ruff, mypy 11 files, arch-check 7 rules, unit 5 passed, e2e 3 passed)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: none (next: F2.1 recipes + heuristic planner)
+- Active feature: F2.1 (column recipes + offline heuristic planner)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
