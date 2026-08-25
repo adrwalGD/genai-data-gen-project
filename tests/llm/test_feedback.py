@@ -54,3 +54,27 @@ def test_add_cancelled_orders(restaurants: Dataset, gemini: GeminiClient) -> Non
     added = new.tables["Orders"].tail(15)
     assert set(added["order_status"]) == {"Cancelled"}
     assert set(added["customer_id"]) <= set(new.tables["Customers"]["customer_id"])
+
+
+def test_cross_table_condition(restaurants: Dataset, gemini: GeminiClient) -> None:
+    new, result, plan = feedback.apply_feedback(
+        restaurants, "Menu", "make all Italian restaurants' dishes cost between 30 and 40", gemini
+    )
+    assert result.report.ok, result.report.summary()
+    cuisine = dict(
+        zip(
+            new.tables["Restaurants"]["restaurant_id"], new.tables["Restaurants"]["cuisine_type"], strict=True
+        )
+    )
+    old_price = dict(
+        zip(restaurants.tables["Menu"]["menu_id"], restaurants.tables["Menu"]["price"], strict=True)
+    )
+    changed = 0
+    menu = new.tables["Menu"]
+    for mid, rid, price in zip(menu["menu_id"], menu["restaurant_id"], menu["price"], strict=True):
+        if cuisine[rid] == "Italian":
+            assert 30 <= float(price) <= 40, plan
+            changed += int(price != old_price[mid])
+        else:
+            assert price == old_price[mid], plan
+    assert changed > 0, plan

@@ -164,10 +164,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F4.2 — Natural-language feedback becomes an EditPlan via Gemini
 - milestone: M4
-- state: active
+- state: passing
 - behavior: `generation.feedback.plan_edit(table, feedback, schema, llm)` turns "set all ratings below 3 to 3", "regenerate emails as firstname.lastname@example.org", "add 15 cancelled orders" into valid `EditPlan`s (structured output) that, once applied, satisfy the request and validate clean.
 - verification: `make test-llm K=feedback`
-- evidence: reopened 2026-08-25: M4 gate FAIL — cross-table filter with a wrong parent attribute (parent(restaurant_id).cuisine) crashed with KeyError instead of EditError; prompt lacks parent-table columns
+- evidence: after M4 gate findings: filters validate parent attributes (EditError lists the parent's columns, dataset untouched) and evaluation errors become EditErrors so the corrective retry self-heals typos; the prompt lists parent tables usable in filters; fk.col accepted as after_column alias. make test K=feedback green; make test-llm K=feedback → 4 passed with Gemini: ratings floor, email regeneration, 15 cancelled orders, and 'make all Italian restaurants' dishes cost between 30 and 40' (only Italian menu prices changed, consistency ok); make check green (2026-08-25)
 
 ## M5 — UI: Data Generation
 
@@ -210,7 +210,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F6.1 — Read-only SQL guard and executor
 - milestone: M6
-- state: not_started
+- state: active
 - behavior: `storage.sql_guard.guard(sql, limit)` accepts exactly one SELECT/UNION/CTE, rejects DML/DDL/multi-statement/`INTO`/`pg_sleep`-style calls with a reason, lowercases quoted identifiers (tables are created lowercase), enforces a LIMIT cap; `storage.postgres.run_readonly(dataset_id, sql)` executes in a READ ONLY transaction with `statement_timeout` and `search_path=ds_<id>` returning columns + rows.
 - verification: `make test K=sql_guard && make test-int K=readonly`
 - evidence: —

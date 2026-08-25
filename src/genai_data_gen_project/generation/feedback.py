@@ -97,7 +97,7 @@ class EditResult(BaseModel):
 
 
 # --- filters --------------------------------------------------------------------------------------
-def compile_filter(where: str | None, table: Table) -> Compiled | None:
+def compile_filter(where: str | None, table: Table, schema: Schema) -> Compiled | None:
     if where is None or not where.strip():
         return None
     try:
@@ -107,9 +107,16 @@ def compile_filter(where: str | None, table: Table) -> Compiled | None:
     for name in compiled.column_refs:
         if not table.has_column(name):
             raise EditError(f"filter {where!r} references unknown column {name!r} of {table.name}")
-    for fk_col, _ in compiled.parent_refs:
-        if table.fk_for_column(fk_col) is None:
-            raise EditError(f"filter {where!r}: parent({fk_col}) is not a foreign key column")
+    for fk_col, pcol in compiled.parent_refs:
+        fk = table.fk_for_column(fk_col)
+        if fk is None:
+            raise EditError(f"filter {where!r}: parent({fk_col}) is not a foreign key column of {table.name}")
+        parent = schema.table(fk.ref_table)
+        if not parent.has_column(pcol):
+            raise EditError(
+                f"filter {where!r}: {parent.name} has no column {pcol!r} "
+                f"(columns: {', '.join(parent.column_names)})"
+            )
     return compiled
 
 
@@ -128,6 +135,8 @@ def matching_positions(
             result = compiled.evaluate(row, parent, rng)
         except NullResult:
             result = None
+        except (KeyError, TypeError, ValueError) as e:
+            raise EditError(f"filter {compiled.source!r} cannot be evaluated on {table.name}: {e}") from e
         if result:
             positions.append(i)
     return positions
@@ -161,7 +170,7 @@ def apply(plan: EditPlan, dataset: Dataset, *, seed: int = 0) -> tuple[Dataset, 
     if gplan is None:
         raise EditError("dataset has no generation plan; regenerate it before editing")
     tables = {name: frame.copy() for name, frame in dataset.tables.items()}
-    _check_ops(plan, table, gplan)
+    _check_ops(plan, table, gplan, schema)
     rows_before = len(tables[table.name])
     affected = 0
     cascaded: dict[str, int] = {}
@@ -211,7 +220,7 @@ def apply(plan: EditPlan, dataset: Dataset, *, seed: int = 0) -> tuple[Dataset, 
     return new_dataset, result
 
 
-def _check_ops(plan: EditPlan, table: Table, gplan: GenerationPlan) -> None:
+def _check_ops(plan: EditPlan, table: Table, gplan: GenerationPlan, schema: Schema) -> None:
     pk = {c.lower() for c in table.primary_key}
     for op in plan.ops:
         if isinstance(op, SetValuesOp | RegenerateColumnOp | UpdatePoolOp):
@@ -225,7 +234,7 @@ def _check_ops(plan: EditPlan, table: Table, gplan: GenerationPlan) -> None:
                 raise EditError(
                     f"{table.name}.{op.column} is a foreign key; only set_values with a constant is allowed"
                 )
-            compile_filter(op.where, table)
+            compile_filter(op.where, table, schema)
             if (
                 isinstance(op, SetValuesOp)
                 and op.recipe is None
@@ -240,7 +249,7 @@ def _check_ops(plan: EditPlan, table: Table, gplan: GenerationPlan) -> None:
                 if name.lower() in pk:
                     raise EditError(f"{table.name}.{name} is a primary key; ids are assigned automatically")
         elif isinstance(op, DeleteRowsOp):
-            if compile_filter(op.where, table) is None:
+            if compile_filter(op.where, table, schema) is None:
                 raise EditError(
                     "delete_rows needs a filter (use where='True' to delete everything explicitly)"
                 )
@@ -257,7 +266,7 @@ def _apply_column_op(
     seed: int,
 ) -> int:
     col = table.column(op.column)
-    positions = matching_positions(schema, tables, table, compile_filter(op.where, table))
+    positions = matching_positions(schema, tables, table, compile_filter(op.where, table, schema))
     if not positions:
         return 0
     frame = tables[table.name]
@@ -326,7 +335,7 @@ def _apply_add_rows(
 def _apply_delete(
     schema: Schema, tables: dict[str, pd.DataFrame], table: Table, op: DeleteRowsOp
 ) -> tuple[int, dict[str, int]]:
-    positions = matching_positions(schema, tables, table, compile_filter(op.where, table))
+    positions = matching_positions(schema, tables, table, compile_filter(op.where, table, schema))
     if not positions:
         return 0, {}
     frame = tables[table.name]
@@ -500,8 +509,16 @@ def build_feedback_prompt(dataset: Dataset, table: Table, feedback: str, *, samp
         {c: csvio.format_value(v) for c, v in zip(frame.columns, vals, strict=True)}
         for vals in frame.head(sample_rows).itertuples(index=False, name=None)
     ]
+    parents = []
+    for fk in table.foreign_keys:
+        if len(fk.columns) == 1 and dataset.schema.has_table(fk.ref_table):
+            parent = dataset.schema.table(fk.ref_table)
+            parents.append(f"  parent({fk.columns[0]}) → {parent.name}({', '.join(parent.column_names)})")
+    parent_block = "\n".join(parents) or "  (none)"
     return (
         f"TABLE ({len(frame)} rows):\n{table_summary(table)}\n\n"
+        "PARENT ROWS usable in filters as parent(fk_column).column — use these exact column names:\n"
+        f"{parent_block}\n\n"
         f"CURRENT RECIPES:\n{recipes}\n\n"
         f"SAMPLE ROWS:\n{json.dumps(rows, ensure_ascii=False, default=str)}\n\n"
         f"USER FEEDBACK:\n{feedback.strip()}\n\n"
@@ -596,7 +613,7 @@ def plan_edit(
     draft = llm.generate_structured(EditPlanDraft, prompt, system=FEEDBACK_SYSTEM, temperature=temperature)
     try:
         plan = draft_to_plan(draft, dataset)
-        _check_ops(plan, table_obj, gplan)
+        _check_ops(plan, table_obj, gplan, schema)
         _check_conditions(plan, feedback)
     except EditError as first_error:
         retry_prompt = f"{prompt}\n\nYour previous plan was invalid: {first_error}. Return a corrected plan."
@@ -605,7 +622,7 @@ def plan_edit(
         )
         try:
             plan = draft_to_plan(draft, dataset)
-            _check_ops(plan, table_obj, gplan)
+            _check_ops(plan, table_obj, gplan, schema)
         except EditError as e:
             raise EditError(f"Gemini produced an invalid edit plan twice: {e}") from e
     if fill_pools:
@@ -644,7 +661,9 @@ def _fill_pool_values(plan: EditPlan, dataset: Dataset, table: Table, llm: LLMBa
             continue
         col = table.column(op.column)
         n = len(
-            matching_positions(dataset.schema, dataset.tables, table, compile_filter(op.where, table))
+            matching_positions(
+                dataset.schema, dataset.tables, table, compile_filter(op.where, table, dataset.schema)
+            )
         ) or len(frame)
         gplan = GenerationPlan.model_validate(dataset.plan) if dataset.plan else None
         current = gplan.table(table.name).column(col.name) if gplan and gplan.table(table.name) else None  # type: ignore[union-attr]

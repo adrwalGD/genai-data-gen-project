@@ -168,3 +168,49 @@ def test_sloppy_filter_types_do_not_crash(restaurants: Dataset) -> None:
     )
     _new, result = feedback.apply(plan, restaurants)
     assert result.affected_rows == 0 and result.report.ok
+
+
+def test_parent_attribute_typos_become_edit_errors_and_prompt_lists_parents(restaurants: Dataset) -> None:
+    from genai_data_gen_project.generation.expressions import parse_parent_ref
+    from genai_data_gen_project.generation.recipes import DecimalRangeRecipe as DR
+
+    before = {name: frame.copy() for name, frame in restaurants.tables.items()}
+    op = feedback.SetValuesOp(
+        column="price", where="parent(restaurant_id).cuisine == 'Italian'", recipe=DR(min=30, max=40)
+    )
+    with pytest.raises(
+        feedback.EditError, match="Restaurants has no column 'cuisine' \\(columns: restaurant_id, name"
+    ):
+        feedback.apply(feedback.EditPlan(table="Menu", ops=[op]), restaurants)
+    for name, frame in before.items():
+        assert frame.equals(restaurants.tables[name])
+
+    def respond(prompt: str) -> dict:  # type: ignore[type-arg]
+        assert "parent(restaurant_id) → Restaurants(restaurant_id, name" in prompt
+        good = "parent(restaurant_id).cuisine_type == 'Italian'"
+        where = good if "no column 'cuisine'" in prompt else "parent(restaurant_id).cuisine == 'Italian'"
+        set_op = {
+            "op": "set_values",
+            "column": "price",
+            "kind": "decimal_range",
+            "min": 30,
+            "max": 40,
+            "where": where,
+        }
+        return {"table": "Menu", "ops": [set_op]}
+
+    fake = FakeLLM(structured={"EditPlanDraft": respond})
+    new, result, _plan = feedback.apply_feedback(
+        restaurants, "Menu", "Italian dishes cost between 30 and 40", fake
+    )
+    assert len(fake.calls) == 2 and result.report.ok and result.affected_rows > 0  # corrective retry fired
+    cuisine = dict(
+        zip(
+            new.tables["Restaurants"]["restaurant_id"], new.tables["Restaurants"]["cuisine_type"], strict=True
+        )
+    )
+    for price, rid in zip(new.tables["Menu"]["price"], new.tables["Menu"]["restaurant_id"], strict=True):
+        if cuisine[rid] == "Italian":
+            assert 30 <= float(price) <= 40
+    assert parse_parent_ref("customer_id.registration_date") == ("customer_id", "registration_date")
+    assert parse_parent_ref("registration_date") is None and parse_parent_ref("a.b.c") is None

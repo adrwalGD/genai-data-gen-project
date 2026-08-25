@@ -116,6 +116,8 @@ Rules:
   that belong to the column's ENUM (or short strings for VARCHAR columns), boolean for booleans, date_window
   for dates, datetime_window for timestamps, text_pool/faker/pattern for text.
 - Respect NOT NULL (null_ratio must stay 0 there) and VARCHAR lengths.
+- date_window/datetime_window may set after_column to a date column of this table or to
+  parent(fk_column).column of the parent row (e.g. parent(customer_id).registration_date).
 - Use text_pool (with a precise brief and 3-5 examples) for names, titles, descriptions, addresses that
   should look real; use faker providers (first_name, last_name, email, city, street_address, company, job,
   phone_number, postcode, country, url, isbn13, sentence, paragraph, catch_phrase, word) for generic values;

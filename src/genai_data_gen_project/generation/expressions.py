@@ -251,4 +251,8 @@ def parse_parent_ref(ref: str) -> tuple[str, str] | None:
         fk_col, _, col = text[len("parent(") :].partition(").")
         if fk_col and col:
             return fk_col.strip(), col.strip()
+    if text.count(".") == 1 and "(" not in text:  # planner shorthand: customer_id.registration_date
+        fk_col, _, col = text.partition(".")
+        if fk_col.strip() and col.strip():
+            return fk_col.strip(), col.strip()
     return None
