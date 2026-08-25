@@ -27,7 +27,7 @@ Docker (full stack): `make docker-up` — mounts `~/.config/gcloud` read-only in
 | `LANGFUSE_BASE_URL` | `https://cloud.langfuse.com` | EU region (US host rejects these keys) |
 | `DATABASE_URL` | `postgresql://datagen:datagen@localhost:5432/datagen` | compose app uses host `postgres` |
 | `DATA_DIR` | `data` | datasets registry |
-| `DEFAULT_ROWS_PER_TABLE` / `MAX_ROWS_PER_TABLE` | `100` / `5000` | UI defaults/limits |
+| `DEFAULT_ROWS_PER_TABLE` / `MAX_ROWS_PER_TABLE` | `100` / `5000` | engine default for programmatic requests / UI and planner cap (the UI's own default of 100 is in ui/state.py) |
 | `SQL_ROW_LIMIT` / `SQL_TIMEOUT_MS` | `500` / `15000` | read-only executor |
 
 ## Troubleshooting (symptom → cause → fix)

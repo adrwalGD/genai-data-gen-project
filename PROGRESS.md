@@ -5,12 +5,12 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M7 Hardening & presentation — complete**: all 38 features passing, `make check-all` green, tag `v1.0`.
-  Gates M0–M6: PASS; M7 gate verifier pending.
+- Milestone: **M7 Hardening & presentation — complete**: all 35 features passing, `make check-all` green, tag `v1.0`.
+  Gates M0–M7: PASS. Project complete; post-v1.0 backlog below.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
-- `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: none — all features passing (M7 gate verifier is the remaining step)
+- `make test-int`: 18 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
+- Active feature: none — all 35 features passing; Gate M7 PASS
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -89,6 +89,12 @@ summary plus anything that does not fit a feature entry.
   7000 rows). Demo dataset `smoke-restaurants` (id akvhqbwyzncl, 7 tables, 10 000 rows, Gemini plan + pools, 14/14 overrides,
   trace 4f4371250c927e3bafd6e87f39784a12) saved + loaded; read-only aggregate query answered in 11 ms. Docker stack rebuilt on
   the UID-1000 image (health ok, ADC readable). Tag `v1.0`.
+- [x] **Gate M7: PASS** (independent verifier, worktree on tag v1.0 = 9305bfd, 2026-08-25): `make check-all` exit 0 (ruff/mypy/
+  arch-check; 215 unit; 15 AppTest; 18 integration; 15 live Gemini/Langfuse in 2:19; e2e 3 schemas); demo dataset
+  `smoke-restaurants` loaded, `SELECT count(*) FROM orders` → 1000, manifest `llm: true`, model gemini-2.5-flash; README delta
+  d89b716→v1.0 verified claim by claim; PROJECT.md traceability: every Phase 1/2–3 and technical requirement MET (file:line +
+  test per row); hard constraints hold (no model literals outside config.py, no API keys, no print, no secrets tracked).
+  7 findings, none blocking → Known Issues / backlog.
 
 ## In Progress
 - (none)
@@ -145,9 +151,16 @@ summary plus anything that does not fit a feature entry.
 9. found during F7.1: the Docker app runs as root, so the bind-mounted `data/datasets` became root-owned and a later local
    `make run` save failed with `Permission denied` (fixed by chown). Fix in F7.2: non-root user (UID 1000) in the Dockerfile.
 
+### M7 verifier findings (2026-08-25) — post-v1.0 backlog
+1. minor `generation/planner.py` `_parse_dt`: Gemini sometimes returns `end='now'` for date windows; such overrides are
+   dropped gracefully (integrity intact, realism intent lost — 5/16 in the restaurants-demo run). Accept `now`/`today` and
+   add `Field(description="ISO date YYYY-MM-DD")` to `ColumnOverride.start/end`.
+2. nit: `st.file_uploader` path has no automated test (AppTest cannot drive uploads); covered by parse simulation only.
+3. nit: `DEFAULT_ROWS_PER_TABLE` only feeds dict-shaped engine requests; the UI default (100) is hardcoded in ui/state.py.
+4. cleanup: throwaway dataset `shot-offline` (i6qedhs753oo) still listed (see item 10 above).
+
 ## Next Steps
-1. M7 gate verifier (fresh-context agent on tag v1.0: `make check-all`, demo dataset queryable, README walkthrough already
-   reproduced by the F7.1 verifier) → record Gate M7 in this file.
+1. Demo rehearsal with README's 5-minute script against `smoke-restaurants` (app on :8501 via `make docker-up`).
 2. Before the demo: delete the throwaway dataset `shot-offline` (i6qedhs753oo) — the deletion was blocked by the tool
    permission classifier in session 2; run `datasets.delete` + `postgres.drop_dataset` manually.
 3. Optional hardening (not required by the spec): M6 finding 8 (restrict guarded tables to the dataset's own schema);
