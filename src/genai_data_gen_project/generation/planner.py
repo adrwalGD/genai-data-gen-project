@@ -15,7 +15,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from ..llm.client import LLMBackend
-from ..schema.models import Schema
+from ..schema.models import Column, Schema
 from ..schema.summary import schema_summary
 from . import heuristics
 from .recipes import (
@@ -35,6 +35,7 @@ from .recipes import (
     PatternRecipe,
     SequenceRecipe,
     TextPoolRecipe,
+    constant_problem,
     validate_plan,
 )
 
@@ -75,6 +76,7 @@ class ColumnOverride(BaseModel):
     true_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
     # faker / pattern
     provider: str | None = None
+    locale: str | None = Field(default=None, description="Faker locale for faker kind, e.g. pl_PL")
     template: str | None = None
     unique: bool | None = None
     # date / datetime windows (ISO strings)
@@ -120,6 +122,11 @@ Rules:
   {seq}).
 - Row counts: change table_rows only when the instructions ask for it or realism demands it (e.g. many order
   items per order); otherwise keep the requested default.
+- Localization: Faker providers are English/US unless you set `locale` (e.g. pl_PL, de_DE, fr_FR) on a faker
+  override — use it for names, addresses and cities of a given country. For culture-specific titles, dishes or
+  descriptions use text_pool with a brief and 3-5 examples in the requested language.
+- A text_pool override keeps the column's uniqueness; you cannot make a unique column non-unique.
+- constant values must be valid literals for the column type (numbers for DECIMAL/INT, ISO dates for DATE).
 - Prefer few, high-impact overrides. Explain each in one short rationale. Put general remarks in notes."""
 
 
@@ -131,12 +138,13 @@ def plan_with_llm(
     *,
     temperature: float = 0.4,
     base: GenerationPlan | None = None,
+    max_rows: int | None = None,
 ) -> tuple[GenerationPlan, PlannerOutput]:
     """Heuristic plan refined by Gemini. Returns (merged plan, raw planner output)."""
     base = base or heuristics.plan(schema, rows_per_table)
     prompt = build_prompt(schema, base, instructions, rows_per_table)
     output = llm.generate_structured(PlannerOutput, prompt, system=PLANNER_SYSTEM, temperature=temperature)
-    merged = merge(base, output, schema)
+    merged = merge(base, output, schema, max_rows=max_rows)
     return merged, output
 
 
@@ -179,7 +187,9 @@ def _short(value: object) -> str:
     return text if len(text) <= 40 else text[:37] + "..."
 
 
-def merge(base: GenerationPlan, output: PlannerOutput, schema: Schema) -> GenerationPlan:
+def merge(
+    base: GenerationPlan, output: PlannerOutput, schema: Schema, *, max_rows: int | None = None
+) -> GenerationPlan:
     """Apply valid overrides/row counts onto a copy of `base`; record every rejection in notes."""
     plan = base.model_copy(deep=True)
     notes = list(plan.notes) + [f"llm: {n}" for n in output.notes]
@@ -188,7 +198,11 @@ def merge(base: GenerationPlan, output: PlannerOutput, schema: Schema) -> Genera
         if tp is None:
             notes.append(f"dropped row count for unknown table {tr.table!r}")
             continue
-        tp.rows = tr.rows
+        rows = tr.rows
+        if max_rows is not None and rows > max_rows:
+            notes.append(f"row count for {tp.table} clamped to {max_rows} (planner asked for {rows})")
+            rows = max_rows
+        tp.rows = rows
     applied = 0
     for ov in output.overrides:
         problem = _apply_override(plan, ov, schema)
@@ -217,7 +231,7 @@ def _apply_override(plan: GenerationPlan, ov: ColumnOverride, schema: Schema) ->
     trial = cp.model_copy(deep=True)
     if ov.kind != "null_ratio_only":
         try:
-            trial.recipe = _to_recipe(_inherit_dates(ov, current), col.scale)
+            trial.recipe = _to_recipe(_inherit(ov, current), col)
         except (ValueError, TypeError) as e:  # pydantic validation or date parsing
             return f"invalid parameters: {str(e).splitlines()[0][:120]}"
     if ov.null_ratio is not None:
@@ -234,6 +248,27 @@ def _apply_override(plan: GenerationPlan, ov: ColumnOverride, schema: Schema) ->
         cp.recipe, cp.null_ratio, cp.rationale = original.recipe, original.null_ratio, original.rationale
         return "; ".join(p.split(": ", 1)[1] for p in problems)
     return None
+
+
+def _inherit(ov: ColumnOverride, current: ColumnRecipe) -> ColumnOverride:
+    """Fill fields the model omitted from the recipe it is replacing (dates, text pools, faker)."""
+    ov = _inherit_dates(ov, current)
+    if ov.kind == "text_pool" and isinstance(current, TextPoolRecipe):
+        updates: dict[str, object] = {}
+        if ov.unique is None or (current.unique and not ov.unique):
+            updates["unique"] = current.unique  # never make a unique column non-unique
+        if ov.provider is None:
+            updates["provider"] = current.fallback_provider
+        if not ov.examples and current.examples:
+            updates["examples"] = list(current.examples)
+        ov = ov.model_copy(update=updates)
+    if (
+        ov.kind == "faker"
+        and isinstance(current, FakerRecipe | TextPoolRecipe | PatternRecipe)
+        and ov.unique is None
+    ):
+        ov = ov.model_copy(update={"unique": getattr(current, "unique", False)})
+    return ov
 
 
 def _inherit_dates(ov: ColumnOverride, current: ColumnRecipe) -> ColumnOverride:
@@ -264,7 +299,8 @@ def _inherit_dates(ov: ColumnOverride, current: ColumnRecipe) -> ColumnOverride:
     return ov.model_copy(update=updates)
 
 
-def _to_recipe(ov: ColumnOverride, column_scale: int | None) -> ColumnRecipe:
+def _to_recipe(ov: ColumnOverride, col: Column) -> ColumnRecipe:
+    column_scale = col.scale
     dist = ov.distribution or Distribution.UNIFORM
     match ov.kind:
         case "int_range":
@@ -284,7 +320,7 @@ def _to_recipe(ov: ColumnOverride, column_scale: int | None) -> ColumnRecipe:
             return BooleanRecipe(true_ratio=0.5 if ov.true_ratio is None else ov.true_ratio)
         case "faker":
             _need(ov, "provider")
-            return FakerRecipe(provider=str(ov.provider), unique=bool(ov.unique))
+            return FakerRecipe(provider=str(ov.provider), unique=bool(ov.unique), locale=ov.locale)
         case "pattern":
             _need(ov, "template")
             return PatternRecipe(template=str(ov.template), unique=bool(ov.unique))
@@ -315,6 +351,9 @@ def _to_recipe(ov: ColumnOverride, column_scale: int | None) -> ColumnRecipe:
                 examples=list(ov.examples or [])[:8],
             )
         case "constant":
+            reason = constant_problem(col, ov.value)
+            if reason:
+                raise ValueError(f"constant {ov.value!r} does not fit {col.raw_type}: {reason}")
             return ConstantRecipe(value=ov.value)
     raise ValueError(f"unsupported override kind {ov.kind!r}")
 

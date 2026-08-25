@@ -108,3 +108,21 @@ def test_offline_mode_uses_faker_only(sample_ddl: dict[str, str]) -> None:
         ).pools
         == {}
     )
+
+
+def test_worker_threads_inherit_the_callers_context() -> None:
+    """OpenTelemetry (Langfuse) nesting relies on contextvars propagating into the pool workers."""
+    import contextvars
+
+    probe: contextvars.ContextVar[str] = contextvars.ContextVar("probe", default="unset")
+    seen: list[str] = []
+
+    def respond(prompt: str) -> dict:  # type: ignore[type-arg]
+        seen.append(probe.get())
+        return {"values": [f"v{i}" for i in range(60)]}
+
+    schema = parse_ddl("CREATE TABLE Restaurants (id INT PRIMARY KEY, name VARCHAR(60) NOT NULL);")
+    plan = heuristics.plan(schema, 30)
+    probe.set("from-main-thread")
+    pools.fill_pools(plan, schema, FakeLLM(json_responses={"TextPool": respond}), max_workers=3)
+    assert seen and all(v == "from-main-thread" for v in seen)

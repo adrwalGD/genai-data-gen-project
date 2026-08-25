@@ -5,7 +5,7 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M4 Feedback edits** — F4.1 active. M3 features passing (gate verification running); F2.7 consistency rules passing. Gates M0, M1, M2: PASS.
+- Milestone: **M4 Feedback edits** — F4.1 active. M3 findings fixed, re-verification pending. Gates M0, M1, M2: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
@@ -43,6 +43,11 @@ summary plus anything that does not fit a feature entry.
 - (none)
 
 ## Blocked / Known Issues
+- **Gate M3: FAIL** (2026-08-25, verifier on `efb0cbe`): (1) Gemini `constant` override `salary='confidential'` crashed generation
+  with raw InvalidOperation — now coerced/validated and dropped with a reason, and `_conform` raises ExpansionError;
+  (2) text-pool GENERATIONs were orphan Langfuse traces — contextvars now copied into pool workers; (3) text_pool
+  overrides dropped `unique`/fallback — inherited; (4) localization — `locale` on faker recipes + prompt rules;
+  (5) row counts uncapped — clamped to `MAX_ROWS_PER_TABLE`. Fixed in the follow-up commit; re-verification pending.
 - Remaining realism gap (offline mode only): Faker catch_phrase/bs names for pools; the LLM pools cover it when Gemini is on.
 - Lesson (2026-08-25, #2): commit `fd9bc71` claimed all M1-verifier fixes but an edit script had aborted midway and the
   chain kept going (exit code unchecked); completed honestly in the follow-up commit. Rule added to docs/loop.md.
@@ -61,8 +66,8 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. M4 feedback: F4.1 EditPlan applier → F4.2 NL → EditPlan with Gemini.
-2. Record the M3 gate verdict when the verifier reports; apply findings.
+1. Re-run M3 verification on the fixed commit; record `Gate M3`.
+2. M4 feedback: F4.1 EditPlan applier → F4.2 NL → EditPlan with Gemini.
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)

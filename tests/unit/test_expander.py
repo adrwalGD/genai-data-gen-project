@@ -188,3 +188,13 @@ def test_unique_email_suffixes_stay_valid_addresses() -> None:
     assert len(set(emails)) == 300 and all(len(e) <= 40 for e in emails)
     pattern = re.compile(r"^[a-z0-9.]+(-\d+)?@[a-z0-9.-]+\.[a-z]+$")
     assert all(pattern.match(e) for e in emails), [e for e in emails if not pattern.match(e)][:5]
+
+
+def test_unconvertible_constants_raise_expansion_error() -> None:
+    from genai_data_gen_project.generation.recipes import ConstantRecipe
+
+    schema = parse_ddl("CREATE TABLE t (id INT PRIMARY KEY, price DECIMAL(10,2) NOT NULL);")
+    plan = heuristics.plan(schema, 5)
+    plan.table("t").column("price").recipe = ConstantRecipe(value="confidential")  # type: ignore[union-attr]
+    with pytest.raises(ExpansionError, match="cannot store 'confidential' in a DECIMAL"):
+        expand(schema, plan, seed=1)

@@ -88,6 +88,9 @@ class BooleanRecipe(BaseModel):
 class FakerRecipe(BaseModel):
     kind: Literal["faker"] = "faker"
     provider: str = Field(description="Faker provider method name, e.g. first_name, city, isbn13")
+    locale: str | None = Field(
+        default=None, description="Faker locale such as pl_PL or de_DE (default en_US)"
+    )
     kwargs: dict[str, str | int | float | bool] = Field(default_factory=dict)
     unique: bool = False
 
@@ -242,10 +245,39 @@ _ALLOWED: dict[ColumnType, set[str]] = {
 }
 
 
-def _faker_has(provider: str) -> bool:
+def _faker_has(provider: str, locale: str | None = None) -> bool:
     from faker import Faker
 
-    return callable(getattr(Faker(), provider, None))
+    try:
+        faker = Faker(locale) if locale else Faker()
+    except AttributeError, ValueError:
+        return False
+    return callable(getattr(faker, provider, None))
+
+
+def _locale_ok(locale: str | None) -> bool:
+    from faker import Faker
+
+    if locale is None:
+        return True
+    try:
+        Faker(locale)
+    except AttributeError, ValueError:
+        return False
+    return True
+
+
+def constant_problem(col: Column, value: str | int | float | bool | None) -> str | None:
+    """Why a constant cannot be stored in `col` (type coercion via the CSV codec), or None when it fits."""
+    from ..storage import csvio
+
+    if value is None:
+        return None
+    try:
+        csvio.parse_value(col, str(value))
+    except csvio.CsvFormatError as e:
+        return str(e)
+    return None
 
 
 def validate_plan(plan: GenerationPlan, schema: Schema) -> list[str]:
@@ -315,8 +347,15 @@ def _column_problems(table: Table, col: Column, cp: ColumnPlan, schema: Schema) 
         out.extend(_derived_problems(table, r.expression, schema))
     if isinstance(r, AggregateRecipe):
         out.extend(_aggregate_problems(table, r, schema))
-    if isinstance(r, FakerRecipe) and not _faker_has(r.provider):
-        out.append(f"unknown Faker provider {r.provider!r}")
+    if isinstance(r, FakerRecipe):
+        if not _locale_ok(r.locale):
+            out.append(f"unknown Faker locale {r.locale!r}")
+        elif not _faker_has(r.provider, r.locale):
+            out.append(f"unknown Faker provider {r.provider!r}")
+    if isinstance(r, ConstantRecipe):
+        reason = constant_problem(col, r.value)
+        if reason:
+            out.append(f"constant {r.value!r} does not fit the column type: {reason}")
     if isinstance(r, TextPoolRecipe) and not _faker_has(r.fallback_provider):
         out.append(f"unknown Faker fallback provider {r.fallback_provider!r}")
     return out

@@ -130,3 +130,53 @@ def test_datetime_and_null_ratio_overrides(sample_ddl: dict[str, str]) -> None:
     assert phones and all(p.startswith("+48 ") and len(p) == 15 for p in phones)
     dates = [d for d in tables["Orders"]["order_date"] if d is not None]
     assert dates and all(d.year == 2025 and d.month <= 6 for d in dates)
+
+
+def test_m3_verifier_findings_constant_coercion_pool_inheritance_locale_and_row_cap(
+    sample_ddl: dict[str, str],
+) -> None:
+    from faker.providers.person.pl_PL import Provider as PolishNames
+
+    from genai_data_gen_project.generation.recipes import FakerRecipe
+
+    schema = parse_ddl(sample_ddl["company"])
+    base = heuristics.plan(schema, 50)
+    output = {
+        "table_rows": [{"table": "Employee_Projects", "rows": 999_999}],
+        "overrides": [
+            {"table": "Employees", "column": "salary", "kind": "constant", "value": "confidential"},
+            {"table": "Employees", "column": "hire_date", "kind": "constant", "value": "not a date"},
+            {"table": "Employee_Projects", "column": "hours_worked", "kind": "constant", "value": "many"},
+            {"table": "Employee_Benefits", "column": "coverage_amount", "kind": "constant",
+             "value": "1200.50"},
+            {"table": "Projects", "column": "name", "kind": "text_pool", "brief": "IT project code names",
+             "unique": False},
+            {"table": "Employees", "column": "first_name", "kind": "faker", "provider": "first_name",
+             "locale": "pl_PL"},
+            {"table": "Employees", "column": "last_name", "kind": "faker", "provider": "last_name",
+             "locale": "xx_NOPE"},
+        ],
+    }  # fmt: skip
+    plan = planner.merge(base, planner.PlannerOutput.model_validate(output), schema, max_rows=5000)
+    assert validate_plan(plan, schema) == []
+    notes = "\n".join(plan.notes)
+    assert (
+        "salary (constant): invalid parameters: constant 'confidential' does not fit DECIMAL(10, 2)" in notes
+    )
+    assert "hire_date (constant): invalid parameters: constant 'not a date' does not fit DATE" in notes
+    assert "hours_worked (constant): invalid parameters: constant 'many'" in notes
+    assert "last_name (faker): unknown Faker locale 'xx_NOPE'" in notes
+    assert "row count for Employee_Projects clamped to 5000 (planner asked for 999999)" in notes
+    assert plan.table("Employee_Projects").rows == 5000  # type: ignore[union-attr]
+    coverage = plan.table("Employee_Benefits").column("coverage_amount").recipe  # type: ignore[union-attr]
+    assert coverage.kind == "constant" and coverage.value == "1200.50"  # type: ignore[union-attr]
+    name = plan.table("Projects").column("name").recipe  # type: ignore[union-attr]
+    assert isinstance(name, TextPoolRecipe) and name.unique is True and name.fallback_provider == "company"
+    first = plan.table("Employees").column("first_name").recipe  # type: ignore[union-attr]
+    assert isinstance(first, FakerRecipe) and first.locale == "pl_PL"
+    plan.table("Employee_Projects").rows = 40  # type: ignore[union-attr]
+    tables = expand(schema, plan, seed=3)
+    assert validate(schema, tables).ok
+    polish = set(PolishNames.first_names)
+    assert all(n in polish for n in tables["Employees"]["first_name"])
+    assert all(str(c) == "1200.50" for c in tables["Employee_Benefits"]["coverage_amount"] if c is not None)

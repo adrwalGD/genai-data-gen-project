@@ -80,7 +80,7 @@ def generate(
         plan = heuristics.plan(schema, request.rows_per_table, default_rows=settings.default_rows_per_table)
         if llm is not None:
             report_progress("Planning with Gemini")
-            plan = _plan_with_llm(schema, plan, request, llm, notes)
+            plan = _plan_with_llm(schema, plan, request, llm, notes, settings)
         lap("plan")
 
         report_progress("Text pools" + (" with Gemini" if llm else " (Faker)"))
@@ -138,7 +138,12 @@ def generate(
 
 
 def _plan_with_llm(
-    schema: Schema, base: GenerationPlan, request: GenerationRequest, llm: LLMBackend, notes: list[str]
+    schema: Schema,
+    base: GenerationPlan,
+    request: GenerationRequest,
+    llm: LLMBackend,
+    notes: list[str],
+    settings: Settings,
 ) -> GenerationPlan:
     try:
         merged, _output = planner.plan_with_llm(
@@ -148,6 +153,7 @@ def _plan_with_llm(
             llm,
             temperature=min(max(request.temperature * 0.6, 0.1), 0.8),
             base=base,
+            max_rows=settings.max_rows_per_table,
         )
         return merged
     except LLMError as e:

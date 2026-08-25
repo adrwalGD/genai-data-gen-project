@@ -65,6 +65,21 @@ class _Context:
     tables: dict[str, pd.DataFrame] = field(default_factory=dict)
     pools: dict[PoolKey, list[str]] = field(default_factory=dict)
     indexes: dict[tuple[str, str], dict[Value, int]] = field(default_factory=dict)
+    fakers: dict[str, Faker] = field(default_factory=dict)
+    seed: int = 0
+
+    def faker_for(self, locale: str | None) -> Faker:
+        """Seeded Faker for a locale (pl_PL, de_DE, ...); the default instance for None."""
+        if not locale:
+            return self.faker
+        if locale not in self.fakers:
+            try:
+                instance = Faker(locale)
+            except (AttributeError, ValueError) as e:
+                raise ExpansionError(f"unknown Faker locale {locale!r}") from e
+            instance.seed_instance(self.seed)
+            self.fakers[locale] = instance
+        return self.fakers[locale]
 
     def parent_index(self, table: str, column: str) -> dict[Value, int]:
         key = (table.lower(), column.lower())
@@ -85,7 +100,7 @@ def expand(
 ) -> dict[str, pd.DataFrame]:
     """Generate every table in dependency order; return DataFrames (object dtype, None for NULL)."""
     order = order or generation_order(schema)
-    ctx = _Context(rng=random.Random(seed), faker=Faker("en_US"))
+    ctx = _Context(rng=random.Random(seed), faker=Faker("en_US"), seed=seed)
     ctx.faker.seed_instance(seed)
     ctx.pools = {_key(t, c): list(v) for (t, c), v in (pools or {}).items()}
     deferred_cols: list[tuple[Table, str]] = []
@@ -195,7 +210,7 @@ def _generate_column(
     if isinstance(r, AggregateRecipe):
         return [r.default] * n  # replaced by _fill_aggregates once the children exist
     if isinstance(r, FakerRecipe):
-        provider = _faker_provider(ctx.faker, r.provider)
+        provider = _faker_provider(ctx.faker_for(r.locale), r.provider)
         return _unique_or_not(ctx, col, n, lambda _i: provider(**r.kwargs), r.unique)
     if isinstance(r, TextPoolRecipe):
         return _pool_values(ctx, table, col, r, n)
@@ -498,6 +513,13 @@ def _conform(col: Column, value: Value) -> Value:
     """Coerce a generated value into the column's type and hard limits (never widen a violation)."""
     if value is None:
         return None
+    try:
+        return _conform_unchecked(col, value)
+    except (ArithmeticError, ValueError, TypeError) as e:  # decimal.InvalidOperation is an ArithmeticError
+        raise ExpansionError(f"{col.name}: cannot store {value!r} in a {col.raw_type} column ({e})") from e
+
+
+def _conform_unchecked(col: Column, value: Value) -> Value:
     t = col.type
     if t.is_integer:
         if isinstance(value, bool):

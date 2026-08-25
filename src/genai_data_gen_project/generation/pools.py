@@ -8,6 +8,7 @@ finally with Faker, and never raises on model errors — a failed pool degrades 
 
 from __future__ import annotations
 
+import contextvars
 import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -134,7 +135,10 @@ def fill_pools(
             return req, [], str(e)
 
     with ThreadPoolExecutor(max_workers=max(1, max_workers)) as pool:
-        for req, values, error in pool.map(work, requests):
+        # copy the caller's context per task so OpenTelemetry spans (Langfuse) nest under the current trace
+        futures = [pool.submit(contextvars.copy_context().run, work, req) for req in requests]
+        for future in futures:
+            req, values, error = future.result()
             if error:
                 result.notes.append(f"{req.table}.{req.column}: pool fell back to Faker — {error}")
             result.llm_values += min(len(values), req.size)  # counted before any Faker top-up

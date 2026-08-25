@@ -28,5 +28,25 @@ def test_restaurants_with_gemini(sample_ddl: dict[str, str]) -> None:
     names = dataset.tables["Restaurants"]["name"].tolist()
     assert len(set(names)) == 60 and not any(n.startswith("Restaurants ") for n in names)
     if tracing:
-        assert dataset.params["trace_id"], "expected a Langfuse trace id when tracing is enabled"
+        trace_id = dataset.params["trace_id"]
+        assert trace_id, "expected a Langfuse trace id when tracing is enabled"
+        generations = _langfuse_generations(settings, trace_id)
+        # planner + every text-pool batch must nest under the data_generation trace (M3 gate finding)
+        assert generations >= 2, f"trace {trace_id} has {generations} GENERATION observations"
     print("langfuse trace:", dataset.params["trace_id"])
+
+
+def _langfuse_generations(settings: Settings, trace_id: str) -> int:
+    import time
+
+    import httpx
+
+    auth = (settings.langfuse_public_key or "", settings.langfuse_secret_key or "")
+    url = f"{settings.langfuse_base_url}/api/public/observations"
+    for _ in range(12):  # ingestion is asynchronous; poll up to ~60 s
+        time.sleep(5)
+        data = httpx.get(url, params={"traceId": trace_id, "limit": 100}, auth=auth, timeout=30).json()
+        count = sum(1 for o in data.get("data", []) if o.get("type") == "GENERATION")
+        if count >= 2:
+            return count
+    return count

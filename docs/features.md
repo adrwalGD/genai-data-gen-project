@@ -151,7 +151,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 - state: passing
 - behavior: `generation.engine.generate(ddl, instructions, rows_per_table, temperature, seed, llm)` returns a validated `Dataset`; `scripts/e2e_smoke.py --llm --schema restaurants --rows 200` completes with a clean validator report, and the run is visible in Langfuse as trace `data_generation` with nested GENERATIONs.
 - verification: `make e2e-llm E2E_ARGS="--schema restaurants --rows 200"`
-- evidence: make test K='engine or pools or expander or planner' green (offline dataset valid with timings/params; FakeLLM planner+pools applied incl. row-count override and pool names; LLM failures degrade to notes with llm pool count 0); make e2e (offline via engine) → all 3 schemas passed; make test-llm K=engine → 1 passed (restaurants 60 rows/table with Gemini, report ok, pools from model, trace id present); make e2e-llm E2E_ARGS='--schema restaurants --rows 200' → OK, langfuse trace 0d96b63bb5b72d01510eda8d22409c33; make check green (2026-08-25)
+- evidence: after M3 gate FAIL fixes: make test → all unit green incl. constant coercion ('confidential' dropped with reason; ExpansionError instead of raw InvalidOperation), text_pool unique/fallback inheritance, faker locale pl_PL names, row cap clamp with note, contextvars propagated into pool workers; make test-llm K='engine or planner' → passed incl. Langfuse trace with ≥2 nested GENERATIONs; make e2e-llm --schema restaurants --rows 200 → OK, langfuse trace 78e6e6ce22dd7c9333f1f387eb528e22; make check green (2026-08-25)
 
 ## M4 — Feedback edits
 

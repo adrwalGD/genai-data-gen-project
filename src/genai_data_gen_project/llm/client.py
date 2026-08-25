@@ -131,6 +131,11 @@ class GeminiClient:
         self._sleep = sleep
         self._gate = threading.BoundedSemaphore(self.settings.llm_max_concurrency)
         init_observability(self.settings)
+        for name in (
+            "google_genai",
+            "google_genai.models",
+        ):  # "Direct use of AFC ... not recommended" on every call
+            logging.getLogger(name).setLevel(logging.ERROR)
         if client is None:
             from google import genai
 
