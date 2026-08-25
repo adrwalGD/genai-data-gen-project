@@ -210,14 +210,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F6.1 — Read-only SQL guard and executor
 - milestone: M6
-- state: active
+- state: passing
 - behavior: `storage.sql_guard.guard(sql, limit)` accepts exactly one SELECT/UNION/CTE, rejects DML/DDL/multi-statement/`INTO`/`pg_sleep`-style calls with a reason, lowercases quoted identifiers (tables are created lowercase), enforces a LIMIT cap; `storage.postgres.run_readonly(dataset_id, sql)` executes in a READ ONLY transaction with `statement_timeout` and `search_path=ds_<id>` returning columns + rows.
 - verification: `make test K=sql_guard && make test-int K=readonly`
-- evidence: —
+- evidence: make test K=sql_guard → 19 passed (guard accepts SELECT/CTE/UNION with LIMIT cap+1, keeps smaller and lowers larger user LIMITs, lowercases quoted identifiers, lists referenced tables, rejects 16 classes with reasons); make test-int K=readonly → 5 passed (run_readonly in ds_<id>: count/join with Decimal results, truncation flag at the cap, DELETE blocked before the DB, hinted SqlError with sqlstate 42703 for unknown columns, unknown relations, 50 ms statement timeout enforced); make check green (2026-08-25)
 
 ### F6.2 — Chat agent with function calling and streamed answers
 - milestone: M6
-- state: not_started
+- state: active
 - behavior: `chat.agent.Agent(dataset, llm).ask(question, history)` yields events (`tool_call(run_sql|render_chart)`, `tool_result`, `text_delta`, `final`) using a manual Gemini function-calling loop (≤ 6 tool rounds), system prompt with schema summary + sample values, and streams the final answer; "How many restaurants are there?" yields a `run_sql` call and an answer containing the true count.
 - verification: `make test K=agent && make test-llm K=agent`
 - evidence: —

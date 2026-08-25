@@ -12,6 +12,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 import psycopg
 from psycopg import sql
@@ -20,6 +21,7 @@ from ..config import Settings, get_settings
 from ..schema.postgres_ddl import emit_foreign_keys, emit_sequence_resets, emit_tables, ident
 from . import csvio
 from .dataset import DATASET_ID_RE, Dataset
+from .sql_guard import GuardedSql, SqlRejected, guard
 
 _log = logging.getLogger(__name__)
 SCHEMA_PREFIX = "ds_"
@@ -174,3 +176,118 @@ def _redact(url: str) -> str:
         user = creds.split(":", 1)[0]
         return f"{head}://{user}:***@{host}"
     return url
+
+
+# --- read-only querying for Talk to your data (F6.1) ----------------------------------------------
+class SqlError(RuntimeError):
+    """PostgreSQL rejected or aborted the query; `hint` says what to try (goes back to the agent)."""
+
+    def __init__(self, message: str, *, hint: str = "", sqlstate: str | None = None) -> None:
+        super().__init__(f"{message} — {hint}" if hint else message)
+        self.message = message
+        self.hint = hint
+        self.sqlstate = sqlstate
+
+
+@dataclass
+class QueryResult:
+    columns: list[str]
+    rows: list[list[Any]]
+    row_count: int
+    truncated: bool
+    elapsed_ms: int
+    sql: str
+    tables: list[str] = field(default_factory=list)
+
+    def to_records(self) -> list[dict[str, Any]]:
+        return [dict(zip(self.columns, row, strict=True)) for row in self.rows]
+
+
+def run_readonly(
+    dataset_id: str,
+    sql_text: str,
+    settings: Settings | None = None,
+    *,
+    limit: int | None = None,
+    timeout_ms: int | None = None,
+) -> QueryResult:
+    """Guard the SQL, then run it READ ONLY with a statement timeout inside schema ds_<id>."""
+    settings = settings or get_settings()
+    if not DATASET_ID_RE.match(dataset_id):
+        raise SqlError(f"invalid dataset id {dataset_id!r}", hint="pick a saved dataset")
+    cap = limit or settings.sql_row_limit
+    guarded: GuardedSql = guard(sql_text, limit=cap)  # SqlRejected propagates with its reason
+    schema_name = f"{SCHEMA_PREFIX}{dataset_id}"
+    started = time.perf_counter()
+    with connect(settings) as conn:
+        try:
+            with conn.transaction(), conn.cursor() as cur:
+                cur.execute("SET TRANSACTION READ ONLY")
+                cur.execute(
+                    sql.SQL("SET LOCAL statement_timeout = {}").format(
+                        sql.Literal(int(timeout_ms or settings.sql_timeout_ms))
+                    )
+                )
+                cur.execute(sql.SQL("SET LOCAL search_path = {}").format(sql.Identifier(schema_name)))
+                cur.execute(guarded.sql)
+                columns = [d.name for d in cur.description or []]
+                fetched = cur.fetchall() if cur.description else []
+                raise _Rollback(columns, [list(row) for row in fetched])
+        except _Rollback as done:  # the transaction block rolled back; nothing was written
+            columns, rows = done.columns, done.rows
+        except psycopg.errors.QueryCanceled as e:
+            raise SqlError(
+                f"query exceeded {timeout_ms or settings.sql_timeout_ms} ms",
+                hint="add WHERE filters or aggregate less data",
+                sqlstate=e.sqlstate,
+            ) from e
+        except psycopg.errors.ReadOnlySqlTransaction as e:
+            raise SqlError(
+                "write attempted inside a read-only query", hint="only SELECT is allowed", sqlstate=e.sqlstate
+            ) from e
+        except psycopg.Error as e:
+            primary = (
+                e.diag.message_primary if e.diag and e.diag.message_primary else _first_line(e)
+            ) or str(e)
+            hint = (
+                e.diag.message_hint
+                if e.diag and e.diag.message_hint
+                else "check table and column names against the schema"
+            )
+            raise SqlError(primary, hint=hint, sqlstate=getattr(e, "sqlstate", None)) from e
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    truncated = len(rows) > guarded.limit
+    return QueryResult(
+        columns=columns,
+        rows=rows[: guarded.limit],
+        row_count=min(len(rows), guarded.limit),
+        truncated=truncated,
+        elapsed_ms=elapsed_ms,
+        sql=guarded.sql,
+        tables=guarded.tables,
+    )
+
+
+class _Rollback(Exception):
+    """Internal: carries the fetched rows out of `conn.transaction()` so the block always rolls back."""
+
+    def __init__(self, columns: list[str], rows: list[list[Any]]) -> None:
+        super().__init__("rollback")
+        self.columns = columns
+        self.rows = rows
+
+
+__all__ = [
+    "LoadError",
+    "LoadResult",
+    "QueryResult",
+    "SqlError",
+    "SqlRejected",
+    "connect",
+    "drop_dataset",
+    "is_loaded",
+    "list_loaded",
+    "load_dataset",
+    "loaded_row_counts",
+    "run_readonly",
+]

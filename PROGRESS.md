@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M6 Talk to your data** — F6.1 active. M4 findings fixed (re-verification pending, combined with the M5 gate); M5 features passing. Gates M0–M3: PASS.
+- Milestone: **M6 Talk to your data** — F6.1 passing, F6.2 active. M4+M5 gate verifier running. Gates M0–M3: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F6.1 (read-only SQL guard and executor)
+- Active feature: F6.2 (chat agent with function calling and streamed answers)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -49,6 +49,8 @@ summary plus anything that does not fit a feature entry.
 - [x] M5 F5.5 Docker: `make docker-up` builds and runs postgres + app (ADC mount, data volume, healthcheck); health ok;
       in-container generation + save into the compose PostgreSQL verified.
 - [x] **Gate M3: PASS** (re-check 2026-08-25 at `5f557d3`): pools yield ×2, batch isolation, 5x row cap all confirmed.
+- [x] M6 F6.1 read-only SQL guard (single SELECT/UNION/CTE, denylist, lowercase quoted identifiers, LIMIT cap+1) and
+      run_readonly (READ ONLY txn, statement_timeout, search_path ds_<id>, hinted SqlError).
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -89,7 +91,7 @@ summary plus anything that does not fit a feature entry.
 
 ## Next Steps
 1. Run the combined M4+M5 gate verifier on the F4.2-fix commit; record Gate M4/M5.
-2. M6 Talk to your data: F6.1 SQL guard → F6.2 agent → F6.3 charts → F6.4 page → F6.5 traces.
+2. M6 Talk to your data: F6.2 agent → F6.3 charts → F6.4 page → F6.5 traces.
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)
