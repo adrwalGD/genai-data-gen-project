@@ -1,0 +1,14 @@
+.git
+.venv
+.env
+*.local
+project-spec/creds.local
+project-spec/sample-ui.png
+data/
+tests/
+docs/
+scripts/
+**/__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache

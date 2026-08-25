@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: datagen-postgres
+    environment:
+      POSTGRES_USER: datagen
+      POSTGRES_PASSWORD: datagen
+      POSTGRES_DB: datagen
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U datagen -d datagen"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    profiles: ["app"]
+    build: .
+    container_name: datagen-app
+    ports:
+      - "${APP_PORT:-8501}:8501"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://datagen:datagen@postgres:5432/datagen
+      GOOGLE_APPLICATION_CREDENTIALS: /gcloud/application_default_credentials.json
+      DATA_DIR: /app/data
+    volumes:
+      - ${GCLOUD_CONFIG_DIR:-~/.config/gcloud}:/gcloud:ro
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3).status==200 else 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:
