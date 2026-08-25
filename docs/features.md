@@ -157,14 +157,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F4.1 — EditPlan model and deterministic applier
 - milestone: M4
-- state: active
+- state: passing
 - behavior: `generation.feedback.EditPlan` supports `set_values`, `regenerate_column`, `add_rows`, `delete_rows`, `update_pool`; `apply(plan, dataset, schema)` keeps PK uniqueness, FK integrity (cascade or re-sample), revalidates and returns the new dataset + report; deleting parent rows cascades or fails with a clear error per plan option.
 - verification: `make test K=feedback`
-- evidence: —
+- evidence: make test K=feedback → 17 passed (set_values with filter/constant and parent-filter recipe with subtotal recomputation, regenerate_column keeps uniqueness, add_rows continues PKs/samples FKs/refreshes aggregates, delete_rows cascades to NOT NULL children with exact counts and SET NULL for nullable FKs, non-cascade refusal, update_pool honours the plan's uniqueness, 9 invalid plans rejected before any change, LLM-friendly JSON schema); make check green (2026-08-25)
 
 ### F4.2 — Natural-language feedback becomes an EditPlan via Gemini
 - milestone: M4
-- state: not_started
+- state: active
 - behavior: `generation.feedback.plan_edit(table, feedback, schema, llm)` turns "set all ratings below 3 to 3", "regenerate emails as firstname.lastname@example.org", "add 15 cancelled orders" into valid `EditPlan`s (structured output) that, once applied, satisfy the request and validate clean.
 - verification: `make test-llm K=feedback`
 - evidence: —

@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M4 Feedback edits** — F4.1 active. M3 findings fixed, re-verification pending. Gates M0, M1, M2: PASS.
+- Milestone: **M4 Feedback edits** — F4.1 passing, F4.2 active. M3 findings fixed, re-verification running. Gates M0, M1, M2: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F4.1 (EditPlan model and deterministic applier)
+- Active feature: F4.2 (natural-language feedback → EditPlan via Gemini)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -36,6 +36,8 @@ summary plus anything that does not fit a feature entry.
       (restaurants 200 rows/table with Gemini, Langfuse trace `data_generation`).
 - [x] F2.7 consistency rules: expression language with parent lookups + conditionals, aggregate recipes, heuristics for
       subtotal/total/status/registration-date relations, consistency checker in the engine report.
+- [x] M4 F4.1 EditPlan model + deterministic applier (filters in the expression language, cascade/SET NULL deletes,
+      derived + aggregate recomputation, revalidation, edit history).
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -66,8 +68,8 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. Re-run M3 verification on the fixed commit; record `Gate M3`.
-2. M4 feedback: F4.1 EditPlan applier → F4.2 NL → EditPlan with Gemini.
+1. F4.2 natural-language feedback → EditPlan with Gemini (structured output) + llm test with 3 feedback styles.
+2. Record the M3 re-verification verdict (verifier running on 3414453).
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)

@@ -28,6 +28,7 @@ from .recipes import (
     AggregateRecipe,
     BooleanRecipe,
     ColumnPlan,
+    ColumnRecipe,
     ConstantRecipe,
     DateTimeWindowRecipe,
     DateWindowRecipe,
@@ -700,3 +701,127 @@ def _fill_aggregates(ctx: _Context, schema: Schema, plan: GenerationPlan) -> Non
                 }
                 result.append(_conform(col, agg[r.agg]))
             frame[col.name] = pd.Series(result, dtype=object)
+
+
+# --- public helpers for editing an existing dataset (F4.1 feedback) -------------------------------
+def conform_value(col: Column, value: Value) -> Value:
+    """Coerce a user/LLM supplied value into the column's type and limits (raises ExpansionError)."""
+    return _conform(col, value)
+
+
+def _context_for(
+    tables: dict[str, pd.DataFrame], seed: int, pools: dict[PoolKey, list[str]] | None
+) -> _Context:
+    ctx = _Context(rng=random.Random(seed), faker=Faker("en_US"), seed=seed)
+    ctx.faker.seed_instance(seed)
+    ctx.tables = dict(tables)
+    ctx.pools = {_key(t, c): list(v) for (t, c), v in (pools or {}).items()}
+    return ctx
+
+
+def regenerate_values(
+    schema: Schema,
+    tables: dict[str, pd.DataFrame],
+    table_name: str,
+    column: str,
+    recipe: ColumnRecipe,
+    *,
+    row_positions: list[int],
+    seed: int = 0,
+    pools: dict[PoolKey, list[str]] | None = None,
+    null_ratio: float = 0.0,
+) -> list[Value]:
+    """New values for `column` at the given row positions; other columns of those rows give context."""
+    ctx = _context_for(tables, seed, pools)
+    table = schema.table(table_name)
+    col = table.column(column)
+    frame = tables[table.name]
+    generated: dict[str, list[Value]] = {
+        c.name: [cast(Value, frame[c.name].iat[i]) for i in row_positions]
+        for c in table.columns
+        if c.name != col.name
+    }
+    cplan = ColumnPlan(column=col.name, recipe=recipe, null_ratio=null_ratio)
+    values = _generate_column(ctx, schema, table, col, cplan, len(row_positions), generated)
+    values = _apply_nulls(ctx, col, cplan, values)
+    return [_conform(col, v) for v in values]
+
+
+def generate_rows(
+    schema: Schema,
+    plan: GenerationPlan,
+    tables: dict[str, pd.DataFrame],
+    table_name: str,
+    n: int,
+    *,
+    seed: int = 0,
+    pools: dict[PoolKey, list[str]] | None = None,
+) -> pd.DataFrame:
+    """`n` extra rows for an existing table (PK sequences continue, FKs sample existing parents)."""
+    ctx = _context_for(tables, seed, pools)
+    table = schema.table(table_name)
+    tplan = plan.table(table_name)
+    if tplan is None:
+        raise ExpansionError(f"plan has no entry for table {table_name!r}")
+    tplan = tplan.model_copy(deep=True)
+    tplan.rows = n
+    frame = _expand_table(ctx, schema, table, tplan, deferred=set())
+    existing = tables[table.name]
+    for cplan in tplan.columns:
+        if isinstance(cplan.recipe, SequenceRecipe) and len(existing):
+            current_max = max((v for v in existing[cplan.column].tolist() if v is not None), default=0)
+            step = cplan.recipe.step
+            frame[cplan.column] = pd.Series([current_max + step * (i + 1) for i in range(n)], dtype=object)
+    return frame
+
+
+def enforce_unique(
+    schema: Schema, plan: GenerationPlan, tables: dict[str, pd.DataFrame], table_name: str, *, seed: int = 0
+) -> None:
+    """Re-establish PK/UNIQUE sets of a table in place (later duplicates are re-drawn or suffixed)."""
+    ctx = _context_for(tables, seed, None)
+    table = schema.table(table_name)
+    tplan = plan.table(table_name)
+    if tplan is None:
+        raise ExpansionError(f"plan has no entry for table {table_name!r}")
+    frame = tables[table.name]
+    columns = {c.name: frame[c.name].tolist() for c in table.columns}
+    plans = {c.column.lower(): c for c in tplan.columns}
+    _enforce_unique_sets(ctx, table, columns, len(frame), plans)
+    for name, values in columns.items():
+        frame[name] = pd.Series(values, dtype=object)
+
+
+def recompute_aggregates(schema: Schema, plan: GenerationPlan, tables: dict[str, pd.DataFrame]) -> None:
+    """Refresh every aggregate column from the current children (after adds/deletes/edits)."""
+    ctx = _context_for(tables, 0, None)
+    _fill_aggregates(ctx, schema, plan)
+    for name in tables:
+        tables[name] = ctx.tables[name]
+
+
+def recompute_derived(schema: Schema, plan: GenerationPlan, tables: dict[str, pd.DataFrame]) -> None:
+    """Re-evaluate deterministic derived columns (e.g. subtotal = quantity * parent price) after edits.
+
+    Tables are visited in generation order so parent changes flow into children; derived expressions that use
+    randomness are left untouched (they are not functions of their inputs).
+    """
+    ctx = _context_for(tables, 0, None)
+    for name in generation_order(schema).tables:
+        table = schema.table(name)
+        tplan = plan.table(name)
+        frame = ctx.tables.get(table.name)
+        if tplan is None or frame is None or frame.empty:
+            continue
+        for cplan in tplan.columns:
+            r = cplan.recipe
+            if not isinstance(r, DerivedRecipe) or not table.has_column(cplan.column):
+                continue
+            if compile_expression(r.expression).uses_random:
+                continue
+            col = table.column(cplan.column)
+            generated = {c.name: frame[c.name].tolist() for c in table.columns if c.name != col.name}
+            values = _derived_values(ctx, schema, table, col, r.expression, len(frame), generated)
+            frame[col.name] = pd.Series([_conform(col, v) for v in values], dtype=object)
+    for name in tables:
+        tables[name] = ctx.tables[name]
