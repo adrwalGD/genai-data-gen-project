@@ -5,8 +5,8 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M1 Schema engine** — F1.1, F1.2 passing; M0 gate verification running (independent verifier).
-- Latest commit: `__F12__` (feat(schema): F1.2 generation order with cycle breaking)
+- Milestone: **M1 Schema engine** — F1.1, F1.2 passing; F1.3 active. M0 gate: PASS (see Completed).
+- Latest commit: `78b5625` (feat(schema): F1.2 generation order with cycle breaking)
 - `make check`: green (ruff, mypy 11 files, arch-check 7 rules, unit 5 passed, e2e 3 passed)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
 - Active feature: F1.3 (Postgres DDL emitter, unit + integration)
@@ -20,6 +20,8 @@ summary plus anything that does not fit a feature entry.
       three sample DDLs (MySQL dialect) including ENUM, CHECK, DEFAULT, AUTO_INCREMENT, table FKs, ALTER TABLE ADD CONSTRAINT.
 - [x] M0 F0.1 scaffold + pinned deps (uv.lock, 89 packages) · F0.2 quality gates (`make check`) · F0.3 Postgres compose +
       integration test · F0.4 Settings/observability + `make check-env` · F0.5 feature tooling + `make exit-check`.
+- [x] **Gate M0: PASS** 2026-08-25 at `38572e8` — independent verifier on a clean clone: setup/check/db-up/test-int/
+      check-env green in 37 s (Vertex 1.5 s, Langfuse trace `1470c49ccc74e0d140c43c961f7b2c83`); 5 harness findings applied.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 

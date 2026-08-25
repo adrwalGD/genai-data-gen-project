@@ -39,6 +39,7 @@ def scratch_schema(pg_conn: psycopg.Connection) -> Iterator[str]:
     try:
         yield name
     finally:
+        pg_conn.rollback()  # leave any failed transaction before cleaning up
         with pg_conn.cursor() as cur:
             cur.execute(f'DROP SCHEMA IF EXISTS "{name}" CASCADE')
         pg_conn.commit()

@@ -8,6 +8,7 @@ Run via `make check-env` (uses the project virtualenv).
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import sys
@@ -138,9 +139,14 @@ def check_langfuse(settings: Settings) -> None:
 
     trace_id = probe()
     client.flush()
-    record(
-        "langfuse", bool(trace_id), f"auth ok; trace `check_env` id={trace_id} → {settings.langfuse_base_url}"
-    )
+    if trace_id:
+        record("langfuse", True, f"auth ok; trace `check_env` id={trace_id} → {settings.langfuse_base_url}")
+    else:
+        record(
+            "langfuse",
+            False,
+            "auth ok but no trace was created — unset LANGFUSE_TRACING_ENABLED=false in the environment",
+        )
 
 
 def check_postgres(settings: Settings) -> None:
@@ -164,6 +170,7 @@ def check_postgres(settings: Settings) -> None:
 
 def main() -> int:
     settings = Settings()
+    logging.getLogger("google_genai").setLevel(logging.ERROR)  # hide AFC advisory noise
     print(
         f"check-env — project={settings.google_cloud_project} model={settings.gemini_model} "
         f"langfuse={'on' if settings.langfuse_enabled else 'off'} db={redact(settings.database_url)}"
@@ -172,7 +179,7 @@ def main() -> int:
     if check_adc():
         check_vertex(settings)
     else:
-        record("vertex", False, "skipped — no ADC credentials")
+        record("vertex", False, "skipped — no ADC credentials; fix the adc line above first")
     check_langfuse(settings)
     check_postgres(settings)
     failed = [name for name, ok in RESULTS if not ok]

@@ -3,6 +3,14 @@
 Append-only log: what was decided, why, what was rejected, and the constraint it creates. New entries go on top.
 Reference an entry from code comments as `DECISIONS.md#YYYY-MM-DD-slug` when a choice looks odd out of context.
 
+## 2026-08-25: Postgres identifiers are emitted lowercase *and* quoted
+- Reason: Postgres folds unquoted identifiers to lowercase. Talk-to-data SQL written by Gemini is unpredictable about
+  quoting (`Library_Branches` vs `"Library_Branches"` vs `library_branches`). Emitting `"library_branches"` makes all
+  three spellings resolve (quoted lowercase == unquoted folded), while still allowing reserved words as names.
+- The IR and CSV exports keep the original DDL spelling; only the database layer (and the prompt schema summary,
+  F1.4) use lowercase. Two names differing only by case in one table → `DDLEmitError` (would collide).
+- Rejected: preserving case with quotes (breaks unquoted LLM queries); unquoted emission (breaks reserved words).
+
 ## 2026-08-25: Pass-state gating is enforced mechanically by a `make check` marker
 - Incident: while closing F1.1 the agent ran `make check | tail`, the pipe hid mypy's non-zero exit, and the feature
   was marked passing and committed with a red gate — exactly the "declared victory too early" failure (lecture 9).

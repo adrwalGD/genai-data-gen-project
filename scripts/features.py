@@ -4,6 +4,7 @@
 Usage:
   features.py list                                 id | state | milestone | title (+ summary)
   features.py next                                 active feature id, else first not_started, else "none"
+  features.py active                               the active feature id, else "none"
   features.py validate                             enforce the rules; exit 1 on violation
   features.py activate ID                          not_started|blocked -> active (WIP = 1)
   features.py pass ID --evidence "cmd → output"   active -> passing (evidence + fresh `make check` marker)
@@ -169,6 +170,12 @@ def cmd_next(feats: list[Feature]) -> int:
     return 0
 
 
+def cmd_active(feats: list[Feature]) -> int:
+    active = [f for f in feats if f.state == "active"]
+    print(active[0].id if active else "none")
+    return 0
+
+
 def cmd_validate(feats: list[Feature]) -> int:
     errors = validate(feats)
     if errors:
@@ -215,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")
     sub.add_parser("next")
+    sub.add_parser("active")
     sub.add_parser("validate")
     a = sub.add_parser("activate")
     a.add_argument("id")
@@ -227,9 +235,10 @@ def main(argv: list[str] | None = None) -> int:
     st.add_argument("--evidence")
     args = p.parse_args(argv)
 
-    if args.cmd in {"list", "next", "validate"}:
+    if args.cmd in {"list", "next", "active", "validate"}:
         _, feats = load()
-        return {"list": cmd_list, "next": cmd_next, "validate": cmd_validate}[args.cmd](feats)
+        handlers = {"list": cmd_list, "next": cmd_next, "active": cmd_active, "validate": cmd_validate}
+        return handlers[args.cmd](feats)
     if args.cmd == "activate":
         return transition(args.id, "active", None, allowed_from=("not_started", "blocked"))
     if args.cmd == "pass":

@@ -28,7 +28,9 @@ unless `.harness/check.ok` (touched by a green `make check`) is newer than every
 
 ## Milestone gates — independent verifier (generator/evaluator separation)
 The implementer never grades its own milestone. When the last feature of a milestone is `passing`:
-1. Spawn a fresh-context verifier with the Agent tool (`general-purpose`) using the prompt template below.
+1. Commit first. Spawn a fresh-context verifier with the Agent tool (`general-purpose`) using the template below;
+   it works in `git worktree add <tmp> HEAD` (pinned commit, immune to concurrent edits in the live tree) and copies
+   `project-spec/creds.local` + `.env` there if the gate needs them; it removes the worktree afterwards.
 2. It runs the gate commands from `docs/PLAN.md` exactly, reads nothing from the conversation, and reports
    `PASS`/`FAIL` with verbatim command output and any deviation between the feature *behaviors* and observed reality.
 3. On `FAIL`: open a fix feature (or reopen the offending feature to `active` — the only allowed backward move,
@@ -37,8 +39,10 @@ The implementer never grades its own milestone. When the last feature of a miles
 
 Verifier prompt template:
 ```
-You are an independent verifier for milestone M<n> of the repository at <path>. Do not modify files.
-Read docs/PLAN.md (M<n> row + section) and docs/features.md (M<n> entries). Run the gate commands exactly as
+You are an independent verifier for milestone M<n> of the repository at <path>. Do not modify tracked files.
+Create an isolated checkout of the pinned commit: `git -C <path> worktree add <tmpdir> <commit>`; copy
+<path>/project-spec/creds.local and <path>/.env into it (never print their contents); run everything inside <tmpdir>;
+finish with `git -C <path> worktree remove --force <tmpdir>`. Read docs/PLAN.md (M<n> row + section) and docs/features.md (M<n> entries). Run the gate commands exactly as
 written, from the repository root. For each feature, judge whether the *behavior* text is actually observable
 (run the verification command; inspect outputs). Report: PASS or FAIL, the commands you ran with their key
 output lines, and a list of discrepancies (behavior claimed vs observed). Be skeptical; default to FAIL when unsure.

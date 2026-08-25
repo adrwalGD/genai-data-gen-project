@@ -20,9 +20,9 @@ setup: env ## install dependencies (uv sync) and create .env
 
 env: ## create .env from .env.example (once) and inject LANGFUSE_* from project-spec/creds.local
 > @if [ ! -f .env ]; then cp .env.example .env && echo "created .env from .env.example"; fi
-> @if [ -f project-spec/creds.local ]; then \
+> @if [ -f project-spec/creds.local ] && grep -qE '^LANGFUSE_(PUBLIC|SECRET)_KEY=' project-spec/creds.local; then \
 >   grep -vE '^LANGFUSE_(PUBLIC|SECRET)_KEY=' .env > .env.tmp && grep -E '^LANGFUSE_(PUBLIC|SECRET)_KEY=' project-spec/creds.local >> .env.tmp && mv .env.tmp .env && echo "injected Langfuse keys from project-spec/creds.local"; \
->   else echo "project-spec/creds.local not found — fill LANGFUSE_* in .env manually (tracing is optional)"; fi
+>   else rm -f .env.tmp; echo "no LANGFUSE_* keys in project-spec/creds.local — fill LANGFUSE_* in .env manually (tracing is optional)"; fi
 
 lint: ## ruff lint + format check
 > $(UV) run ruff check src tests scripts

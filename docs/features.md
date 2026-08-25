@@ -38,7 +38,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 ### F0.5 — Harness tooling (feature list, exit gate)
 - milestone: M0
 - state: passing
-- behavior: `scripts/features.py validate` enforces the state rules; `make features` lists id/state/milestone; `make exit-check` runs `make check`, validates the feature list, fails on debug leftovers (`breakpoint()`, `pdb`, stray `print(` in `src/`, `TODO` without a feature id) and when PROGRESS.md was neither modified nor part of HEAD.
+- behavior: `scripts/features.py validate` enforces the state rules; `make features` lists id/state/milestone; `make exit-check` runs `make check`, validates the feature list, fails on debug leftovers (`breakpoint()`, `pdb`, `TODO` without a feature id; stray `print(` in `src/` fails via `make check` → arch-check R4/ruff T20) and when PROGRESS.md was neither modified nor part of HEAD.
 - verification: `make features && make exit-check`
 - evidence: make features → 34 features listed with states; make exit-check → make check green + 'exit-check: OK' (features valid, PROGRESS.md touched, no debug leftovers) (2026-08-25)
 
@@ -60,10 +60,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F1.3 — Postgres DDL emitter creates all sample schemas in a real database
 - milestone: M1
-- state: active
-- behavior: `schema.postgres_ddl.emit_tables(schema)` + `emit_foreign_keys(schema)` produce DDL that executes in Postgres 17 for all three samples inside a fresh schema (`ENUM`→`VARCHAR`+`CHECK`, `AUTO_INCREMENT`→identity, `DATETIME`→`TIMESTAMP`, quoted identifiers preserving case-insensitive names), and `information_schema` reflects every column.
+- state: passing
+- behavior: `schema.postgres_ddl.emit_tables(schema)` + `emit_foreign_keys(schema)` produce DDL that executes in Postgres 17 for all three samples inside a fresh schema (`ENUM`→`VARCHAR`+`CHECK`, `AUTO_INCREMENT`→identity, `DATETIME`→`TIMESTAMP`, identifiers lowercased and quoted so LLM SQL works quoted or unquoted, CHECK/ENUM/FK violations rejected by the database), and `information_schema` reflects every column.
 - verification: `make test K=postgres_ddl && make test-int K=postgres_ddl`
-- evidence: —
+- evidence: make test K=postgres_ddl → 19 passed (type map, identity/defaults/unique/enum-check column SQL, quoted-lowercase CHECK columns, FK naming/ON DELETE/dedupe, sequence resets, case-collision error); make test-int K=postgres_ddl → 4 passed (3 sample schemas create in PostgreSQL 17 with all columns/nullability/FK counts reflected; identity reset → next id 2; DB rejects ENUM/CHECK/FK/UNIQUE violations; unquoted/quoted/mixed-case names resolve); make check green (2026-08-25)
 
 ### F1.4 — Compact schema summary for prompts
 - milestone: M1

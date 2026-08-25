@@ -34,7 +34,8 @@ Docker (full stack): `make docker-up` — mounts `~/.config/gcloud` read-only in
 - `404 Publisher model ... gemini-2.0-flash-001 was not found` → model retired → use `gemini-2.5-flash` (default).
 - `response.text is None` / empty structured output → thinking consumed the token budget → `thinking_budget=0` or raise `max_output_tokens`.
 - `401 ... invalid_grant` / `Reauthentication is needed` → ADC expired → `gcloud auth application-default login`.
-- `UserWarning: ... end user credentials ... without a quota project` → harmless.
+- `UserWarning: ... end user credentials ... without a quota project` → harmless; silence with
+  `gcloud auth application-default set-quota-project gd-gcp-gridu-genai`.
 - `429 RESOURCE_EXHAUSTED` → lower `LLM_MAX_CONCURRENCY`, smaller batches; client retries with backoff.
 - `psycopg.OperationalError: connection refused` → `make db-up`; in Docker use host `postgres`.
 - Langfuse `auth_check()` False → keys belong to EU project "My Project" → `LANGFUSE_BASE_URL=https://cloud.langfuse.com`.

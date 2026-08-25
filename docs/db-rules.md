@@ -14,7 +14,7 @@
 | `VARCHAR(n)`, `TEXT`, `DATE`, `BOOLEAN`, `DECIMAL(p,s)`, `INT` | same |
 | `DEFAULT CURRENT_TIMESTAMP` / literals | same |
 | `CHECK (expr)` | same expression (sqlglot re-rendered for postgres) |
-| identifiers | always double-quoted, original case preserved (`"Library_Branches"`) |
+| identifiers | lowercased **and** double-quoted (`"library_branches"`) — resolves quoted or unquoted in LLM SQL; ≤ 63 chars |
 - `emit_tables(schema)` emits `CREATE TABLE` without FK constraints (any order); `emit_foreign_keys(schema)` emits
   `ALTER TABLE ... ADD CONSTRAINT fk_<table>_<col> FOREIGN KEY ...` for **all** FKs — added after data load so cyclic
   references load, and the database itself proves referential integrity.

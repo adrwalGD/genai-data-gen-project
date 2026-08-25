@@ -17,6 +17,12 @@ fi
 [ "$touched" -eq 1 ] || problem "PROGRESS.md was neither modified nor committed in HEAD" \
   "update Current State / Completed / In Progress / Known Issues / Next Steps / Session log before ending"
 
+# 2b. PROGRESS.md "Active feature" line agrees with docs/features.md (the two state files must not drift)
+active=$(python3 scripts/features.py active 2>/dev/null || echo "?")
+progress_active=$(grep -oE '^- Active feature: (F[0-9]+\.[0-9]+|none)' PROGRESS.md | head -1 | sed -E 's/^- Active feature: //')
+[ "$active" = "${progress_active:-?}" ] || problem "PROGRESS.md says active feature '${progress_active:-<missing>}' but docs/features.md says '$active'" \
+  "set the '- Active feature:' line in PROGRESS.md to '$active' (or '- Active feature: none')"
+
 # 3. debug leftovers
 hits=$(grep -rn --include='*.py' -E 'breakpoint\(\)|import pdb|pdb\.set_trace|st\.write\("debug|console\.log' src scripts tests || true)
 [ -n "$hits" ] && problem "debug leftovers:"$'\n'"$hits" "remove them"
