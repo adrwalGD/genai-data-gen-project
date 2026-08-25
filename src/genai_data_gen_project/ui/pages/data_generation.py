@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+
 import streamlit as st
 
 from genai_data_gen_project.generation import engine, export
-from genai_data_gen_project.schema.parser import DDLParseError, parse_ddl
+from genai_data_gen_project.schema.parser import DDLParseError, error_context, parse_ddl
+from genai_data_gen_project.schema.summary import schema_summary
 from genai_data_gen_project.ui import services, state
 
 state.init()
@@ -52,10 +55,15 @@ with st.container(border=True):
             )
             for note in schema.notes:
                 st.warning(note)
+            with st.expander("Tables, columns and keys"):
+                st.code(schema_summary(schema), language="text")
             with st.expander("Show DDL"):
                 st.code(ddl_text, language="sql")
         except DDLParseError as e:
             st.error(f"The DDL could not be parsed: {e}")
+            snippet = error_context(ddl_text, str(e))
+            if snippet:
+                st.code(snippet, language="text")
     else:
         st.info("Choose a schema to continue.")
 
@@ -65,7 +73,10 @@ with st.container(border=True):
     st.text_area(
         "Instructions (prompt)",
         key=state.SS_INSTRUCTIONS,
-        placeholder="e.g. Italian and Polish restaurants in Kraków; realistic dish names; reviews in English",
+        placeholder=(
+            "e.g. family-run Italian and Indian restaurants in New Jersey; "
+            "realistic dish names; reviews in English"
+        ),
         height=90,
     )
     with st.expander("Advanced parameters", expanded=True):
@@ -113,6 +124,10 @@ if generate and schema is not None:
     except services.UIError as e:
         st.session_state[state.SS_LAST_ERROR] = str(e)
         st.error(str(e))
+    except Exception as e:  # F7.2: never show a raw traceback
+        logging.getLogger(__name__).exception("generation failed")
+        st.session_state[state.SS_LAST_ERROR] = str(e)
+        st.error(f"Unexpected error while generating ({type(e).__name__}: {str(e)[:200]}) — see the app log.")
 
 # --- 3. preview -----------------------------------------------------------------------------------
 dataset = st.session_state[state.SS_DATASET]

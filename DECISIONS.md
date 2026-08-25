@@ -88,3 +88,17 @@ Reference an entry from code comments as `DECISIONS.md#YYYY-MM-DD-slug` when a c
   the single command surface; executable architecture rules (`make arch-check`); session exit gate (`make exit-check`);
   independent fresh-context verifier for milestone gates (generator/evaluator separation).
 - Python 3.14 kept from the scaffold (all dependencies import fine); `uv` for env/lock; ruff + mypy for L1 checks.
+
+## 2026-08-25 — F7.2 hardening decisions
+- **Stream priming inside `_call`.** `generate_content_stream` is a generator function, so the request is only sent at the first
+  `next()`; fetching the first chunk inside `_call` gives streamed answers the same retry/backoff/classification as every
+  other call, and mid-stream failures are wrapped by `classify_error`. Alternative rejected: retrying the whole stream from
+  the agent (duplicates partial output in the UI).
+- **Child spans use `update_current_span`, not `propagate_attributes`.** Propagated attributes become trace-level metadata
+  (verified: `arg_sql` showed up on the trace). Only the root span of a turn propagates session id/tags.
+- **Guard rejects DML anywhere in the tree + sequence functions.** The READ ONLY transaction already blocked data-modifying
+  CTEs (sqlstate 25006), but the guard is the documented contract ("rejects DML") and gives the model a better hint.
+- **Docker app runs as UID 1000.** The bind-mounted `./data` was created root-owned by the container and broke a later local
+  `make run` save. A fixed UID matching the usual desktop user is simpler than `user: ${UID}` plumbing in compose.
+- **Pages catch `Exception` as a last resort.** A demo must never show a Streamlit traceback; the exception is logged and the
+  message names the type so the log line is easy to find.

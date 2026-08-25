@@ -70,3 +70,18 @@ def test_rejections_are_explained(sql: str, fragment: str) -> None:
     pattern = fragment.replace("(", "\\(").replace(")", "\\)").replace("...", "\\.\\.\\.")
     with pytest.raises(SqlRejected, match=pattern):
         guard(sql, limit=100)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "WITH d AS (DELETE FROM orders RETURNING *) SELECT count(*) FROM d",
+        "WITH i AS (INSERT INTO reviews (rating) VALUES (5) RETURNING review_id) SELECT * FROM i",
+        "WITH u AS (UPDATE menu SET price = 0 RETURNING menu_id) SELECT * FROM u",
+        "SELECT nextval('orders_order_id_seq')",
+        "SELECT setval('orders_order_id_seq', 1)",
+    ],
+)
+def test_data_modifying_ctes_and_sequence_functions_are_rejected(sql: str) -> None:
+    with pytest.raises(SqlRejected, match="not allowed"):
+        guard(sql, limit=10)

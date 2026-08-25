@@ -15,6 +15,10 @@ from sqlglot import exp
 from sqlglot.errors import SqlglotError
 
 DENIED_FUNCTIONS = {
+    "nextval",
+    "setval",
+    "lastval",
+    "currval",
     "pg_sleep",
     "pg_sleep_for",
     "pg_sleep_until",
@@ -66,6 +70,12 @@ def guard(sql: str, *, limit: int) -> GuardedSql:
     if not isinstance(root, exp.Select | exp.SetOperation):
         raise SqlRejected(
             f"only read-only SELECT queries are allowed (got {type(root).__name__.upper()}) — "
+            "this assistant never modifies data"
+        )
+    writer = root.find(exp.Insert, exp.Update, exp.Delete, exp.Merge)
+    if writer is not None:
+        raise SqlRejected(
+            f"{type(writer).__name__.upper()} inside the query (e.g. in a WITH clause) is not allowed — "
             "this assistant never modifies data"
         )
     for select in root.find_all(exp.Select):

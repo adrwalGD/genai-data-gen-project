@@ -254,14 +254,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F7.2 — Actionable errors and UX polish
 - milestone: M7
-- state: active
+- state: passing
 - behavior: DDL parse errors show line context; Vertex 429/5xx show a retry hint; empty query results and guard rejections are explained in the chat; long generations show per-table progress; no raw tracebacks reach the UI.
 - verification: `make test-ui K=errors`
-- evidence: —
+- evidence: make test-ui K=errors: 4 passed (parse-error line context, quota hint fallback, chat errors explained without tracebacks); make check green (215 unit + 15 AppTest); make test-llm K='trace or agent': 3 passed live; docker compose build app → id uid=1000(app)
 
 ### F7.3 — Final full gate and demo dataset
 - milestone: M7
-- state: not_started
+- state: active
 - behavior: `make check-all` is green; a demo dataset (restaurants, 1000 rows/table, LLM-generated) is saved and queryable; git tag `v1.0` created.
 - verification: `make check-all`
 - evidence: —

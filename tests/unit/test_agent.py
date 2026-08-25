@@ -149,3 +149,38 @@ def test_trace_ids_are_none_without_langfuse_and_session_is_kept(sample_ddl: dic
     events = list(agent.ask("count"))
     assert agent.session_id == "s-1" and agent.dataset_id == "abc"
     assert events[-1].kind == "final" and events[-1].trace_id is None and agent.last_trace_id is None
+
+
+class BrokenStreamLLM(FakeLLM):
+    def stream_text(self, contents, *, system=None, temperature=0.3):  # type: ignore[no-untyped-def,override]
+        raise RuntimeError("socket closed")
+
+
+def test_unexpected_exceptions_become_error_events(sample_ddl: dict[str, str]) -> None:
+    fake = BrokenStreamLLM(tool_turns=[tool_call("run_sql", sql="SELECT count(*) AS n FROM restaurants")])
+    agent = Agent(parse_ddl(sample_ddl["restaurants"]), fake, fake_executor, settings=settings())
+    events = list(agent.ask("count"))
+    assert (
+        events[-1].kind == "error"
+        and "socket closed" in events[-1].text
+        and "RuntimeError" in (events[-1].error or "")
+    )
+
+
+def test_dispatch_explains_database_outage_and_empty_results() -> None:
+    from genai_data_gen_project.chat import tools
+    from genai_data_gen_project.storage import postgres
+
+    def down(sql_text: str) -> postgres.QueryResult:
+        raise postgres.LoadError("connection refused")
+
+    outcome = tools.dispatch("run_sql", {"sql": "SELECT 1"}, down, None)
+    assert outcome.error and "PostgreSQL is not reachable" in outcome.error and "make db-up" in outcome.error
+
+    def empty(sql_text: str) -> postgres.QueryResult:
+        return postgres.QueryResult(
+            columns=["n"], rows=[], row_count=0, truncated=False, elapsed_ms=1, sql=sql_text
+        )
+
+    outcome = tools.dispatch("run_sql", {"sql": "SELECT 1"}, empty, None)
+    assert outcome.error is None and "no rows" in outcome.response["note"]

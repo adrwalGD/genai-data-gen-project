@@ -85,7 +85,20 @@ def dispatch(
             return ToolOutcome(
                 name, args, {"error": e.message, "hint": e.hint, "sqlstate": e.sqlstate}, error=str(e)
             )
-        return ToolOutcome(name, args, _result_for_model(result), result=result)
+        except postgres.LoadError as e:  # F7.2: database down between the page check and the query
+            message = (
+                f"PostgreSQL is not reachable — run `make db-up` and retry ({str(e).splitlines()[0][:160]})"
+            )
+            return ToolOutcome(
+                name,
+                args,
+                {"error": message, "hint": "tell the user the database is unavailable"},
+                error=message,
+            )
+        payload = _result_for_model(result)
+        if result.row_count == 0:
+            payload["note"] = "the query returned no rows — tell the user and suggest what to check or relax"
+        return ToolOutcome(name, args, payload, result=result)
     if name == "render_chart":
         if last_result is None or not last_result.rows:
             return ToolOutcome(

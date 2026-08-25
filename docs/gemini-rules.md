@@ -88,3 +88,11 @@ lf.flush()   # after each user action (Streamlit is long-lived) so traces show u
   `tags=` to child spans — Langfuse tags are trace-level and a child tag leaks onto the trace.
 - GENERATIONs come from the openinference instrumentor (`GenerateContent`, `GenerateContentStream`); `flush()` after
   every turn so short-lived sessions still export.
+
+### Streaming errors (F7.2, verified with the SDK source)
+- `models.generate_content_stream` is a *generator function*: the HTTP request happens at the first `next()`, not at the
+  call. `GeminiClient.stream_text` therefore fetches the first chunk inside `_call` (retries/backoff/classification apply)
+  and wraps the remaining iteration in `classify_error` — callers only ever see `LLMError`.
+- The agent turns *any* exception into an `error` event with a short explanation; pages catch `Exception` as a last
+  resort and log it. Raw tracebacks must never reach the UI.
+

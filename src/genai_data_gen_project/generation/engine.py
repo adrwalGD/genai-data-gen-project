@@ -157,7 +157,7 @@ def _plan_with_llm(
         )
         return merged
     except LLMError as e:
-        notes.append(f"planner: Gemini failed ({e}); heuristic plan used")
+        notes.append(f"planner: Gemini failed ({e.message} — {e.hint}); heuristic plan used")
         _log.warning("LLM planner failed, using heuristics: %s", e)
         return base
 

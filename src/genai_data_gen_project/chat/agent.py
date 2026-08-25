@@ -8,17 +8,20 @@ everything the UI renders: SQL + tables, chart specs, text deltas, the final tex
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from ..config import Settings, get_settings
-from ..llm.client import LLMBackend, LLMError, function_response, user_content
+from ..llm.client import LLMBackend, LLMError, function_response, model_content, user_content
 from ..observability import current_trace_id, flush, traced
 from ..schema.models import Schema
 from ..schema.summary import schema_summary
 from ..storage import postgres
 from . import tools
+
+_log = logging.getLogger(__name__)
 
 EventKind = Literal["tool_call", "tool_result", "text_delta", "final", "error"]
 
@@ -121,7 +124,7 @@ class Agent:
         for turn in (history or [])[-6:]:
             contents.append(user_content(turn.question))
             recap = turn.answer if not turn.sql else f"{turn.answer}\n(SQL used: {'; '.join(turn.sql)})"
-            contents.append(_model_text(recap))
+            contents.append(model_content(recap))
         contents.append(user_content(question))
         last_result: postgres.QueryResult | None = None
         try:
@@ -176,14 +179,17 @@ class Agent:
                 text=f"Gemini failed: {e.message} — {e.hint}",
                 trace_id=self.last_trace_id,
             )
+        except Exception as e:  # F7.2: no raw traceback reaches the chat; the trace id points to the details
+            _log.exception("talk-to-data turn failed")
+            yield AgentEvent(
+                "error",
+                error=f"{type(e).__name__}: {e}",
+                text=f"Something went wrong while answering ({type(e).__name__}: {str(e)[:200]}) — "
+                "try again or rephrase the question.",
+                trace_id=self.last_trace_id,
+            )
 
 
 def _span_args(args: dict[str, Any]) -> dict[str, Any]:
     """Tool arguments as short string attributes for the tool span (SQL text, chart spec fields)."""
     return {f"arg_{k}": str(v)[:500] for k, v in args.items()}
-
-
-def _model_text(text: str) -> Any:
-    from google.genai import types
-
-    return types.Content(role="model", parts=[types.Part.from_text(text=text)])

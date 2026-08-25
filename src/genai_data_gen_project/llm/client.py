@@ -17,6 +17,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
+from itertools import chain
 from typing import Any, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -240,17 +241,25 @@ class GeminiClient:
     ) -> Iterator[str]:
         config = self._config(temperature=temperature, system_instruction=system)
 
-        def start() -> Any:
-            return self._client.models.generate_content_stream(
-                model=self.model, contents=contents, config=config
+        def start() -> tuple[Any, Any]:
+            # generate_content_stream is a generator: the HTTP request happens at the first next(), so the
+            # first chunk is fetched here, inside _call, where 429/5xx are retried and classified (F7.2).
+            stream = iter(
+                self._client.models.generate_content_stream(
+                    model=self.model, contents=contents, config=config
+                )
             )
+            return next(stream, None), stream
 
-        stream = self._call(start)
+        first, stream = self._call(start)
         last_usage = None
-        for chunk in stream:
-            last_usage = getattr(chunk, "usage_metadata", None) or last_usage
-            if getattr(chunk, "text", None):
-                yield chunk.text
+        try:
+            for chunk in chain([first] if first is not None else [], stream):
+                last_usage = getattr(chunk, "usage_metadata", None) or last_usage
+                if getattr(chunk, "text", None):
+                    yield chunk.text
+        except Exception as e:  # mid-stream failure: normalise, never leak SDK exceptions to callers
+            raise classify_error(e) from e
         self.usage.add(last_usage)
 
     def generate_with_tools(
@@ -326,7 +335,8 @@ def classify_error(e: Exception) -> LLMError:
         )
         return LLMError(text, hint=hint, retryable=True, status=status if isinstance(status, int) else None)
     if status == 404:
-        return LLMError(text, hint="model not found/retired — set GEMINI_MODEL=gemini-2.5-flash", status=404)
+        default_model = Settings.model_fields["gemini_model"].default
+        return LLMError(text, hint=f"model not found/retired — set GEMINI_MODEL={default_model}", status=404)
     if status in (401, 403) or "invalid_grant" in text or "Reauthentication" in text:
         return LLMError(
             text,
@@ -400,3 +410,10 @@ def user_content(text: str) -> Any:
     from google.genai import types
 
     return types.Content(role="user", parts=[types.Part.from_text(text=text)])
+
+
+def model_content(text: str) -> Any:
+    """A prior model turn as Content (chat history recap) — keeps google.genai types out of chat/."""
+    from google.genai import types
+
+    return types.Content(role="model", parts=[types.Part.from_text(text=text)])

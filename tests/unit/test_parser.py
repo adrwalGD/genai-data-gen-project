@@ -226,3 +226,18 @@ def test_dialect_fallback_and_unknown_types_are_reported_in_notes() -> None:
     assert any(n.startswith("parsed as postgres after [mysql]") for n in schema.notes)
     assert any("unknown type 'VARCHR(100)'" in n for n in schema.notes)
     assert parse_ddl("CREATE TABLE a (id INT PRIMARY KEY);").notes == []
+
+
+def test_error_context_points_at_the_failing_line() -> None:
+    from genai_data_gen_project.schema.parser import error_context
+
+    ddl = (
+        "CREATE TABLE a (id INT);\n"
+        "CREATE TABLE b (id INT, FOREIGN KEY (x) REFERENCES );\n"
+        "CREATE TABLE c (id INT);"
+    )
+    with pytest.raises(DDLParseError) as info:
+        parse_ddl(ddl)
+    snippet = error_context(ddl, str(info.value))
+    assert snippet is not None and "   2 | CREATE TABLE b" in snippet and "^" in snippet
+    assert error_context(ddl, "no position here") is None

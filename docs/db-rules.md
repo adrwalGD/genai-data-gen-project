@@ -38,3 +38,9 @@
    → fetch → `ROLLBACK`. Return `QueryResult{columns, rows, row_count, truncated, elapsed_ms, sql}`.
 5. Errors surface as `SqlError(message, hint)` with the Postgres message — the agent gets it back as a tool result
    so it can correct the query (max 6 tool rounds).
+
+### Guard additions (F7.2)
+- Any `INSERT/UPDATE/DELETE/MERGE` node anywhere in the tree (e.g. a data-modifying CTE) is rejected up front; the
+  READ ONLY transaction remains the second line of defence (sqlstate 25006).
+- Sequence functions `nextval/setval/lastval/currval` are denied like `pg_sleep`, `pg_read_file`, `dblink`.
+

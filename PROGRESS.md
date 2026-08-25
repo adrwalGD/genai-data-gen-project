@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M7 Hardening & presentation** — F7.1 active. Gates M0–M6: PASS.
+- Milestone: **M7 Hardening & presentation** — F7.1, F7.2 passing; F7.3 active. Gates M0–M6: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F7.1 (README + demo walkthrough)
+- Active feature: F7.3 (final full gate and demo dataset)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -71,6 +71,18 @@ summary plus anything that does not fit a feature entry.
   — DML/DDL/COPY/pg_sleep/pg_read_file rejected by the guard, data-modifying CTEs and setval blocked by READ ONLY (25006);
   timeout → 57014 hint; LIMIT capped to 501. Trace 0c9c51439dcc844bb16fab33a8ccb42b verified via API (session, tag, tool.run_sql
   span, 3 GENERATIONs). 8 non-blocking findings → Known Issues / F7.2.
+- [x] M7 F7.1 README + demo walkthrough (d89b716): requirements→code map, mermaid architecture, prerequisites, setup, run,
+  verification table, 5-minute demo script, 3 headless-Chrome screenshots (docs/screenshots). Independent verifier followed
+  the README from a clean clone: setup/db-up/check-env/check/test-int/test-llm K=client/e2e/run all exit 0 → F7.1 PASS;
+  its 11 wording findings (GNU make ≥ 4, `make run PORT=`, expander names, chart types, demo prompt vs ENUM) folded in.
+- [x] M7 F7.2 Actionable errors & UX polish: stream_text primes the first chunk inside `_call` (429/5xx retried +
+  classified, mid-stream errors → LLMError); agent turns any exception into an `error` event; pages catch `Exception`;
+  DDL parse errors show the failing line with a caret (`schema.parser.error_context`); planner fallback note carries the
+  hint; guard rejects DML anywhere in the tree + nextval/setval/lastval/currval; `dispatch` explains PostgreSQL outages and
+  empty results; truncated/empty captions survive replay, errors render once; child spans keep metadata off the trace;
+  `model_content` helper removes google.genai from chat/; Dockerfile runs as UID 1000; `make run PORT=`; docker-up creates
+  data/. `make test-ui K=errors`: 4 passed; unit 215; live `make test-llm K='trace or agent'`: 3 passed; image builds, `id` =
+  uid=1000(app).
 
 ## In Progress
 - (none)
@@ -108,7 +120,7 @@ summary plus anything that does not fit a feature entry.
 - `scripts/` are linted but not type-checked by mypy (`packages = ["genai_data_gen_project"]`); acceptable for M0.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
-### M6 verifier findings (2026-08-25) — scheduled for F7.2 unless noted
+### M6 verifier findings (2026-08-25) — 1–7 and 9 fixed in F7.2; 8 left as optional hardening; 10 pending
 1. major `llm/client.py stream_text`: `generate_content_stream` is a generator, so the HTTP call happens at first `next()`
    outside `_call` → a 429/5xx on the streamed final answer is neither retried nor turned into `LLMError`; the agent only
    catches `LLMError` → raw traceback in the chat. Fix: iterate inside `_call`/classify_error; agent converts any exception.
@@ -128,11 +140,15 @@ summary plus anything that does not fit a feature entry.
    `make run` save failed with `Permission denied` (fixed by chown). Fix in F7.2: non-root user (UID 1000) in the Dockerfile.
 
 ## Next Steps
-1. F7.1 README + demo walkthrough (active): screenshots via headless Chrome, README-walkthrough verifier → pass.
-2. F7.2 actionable errors/UX polish incl. M6 findings 1–7 and 9 (Dockerfile non-root user) → `make test-ui K=errors`.
-3. F7.3 `make check-all`, demo dataset restaurants 1000 rows (LLM), rebuild Docker image, tag v1.0.
+1. F7.3 (active): `make check-all`; demo dataset restaurants 1000 rows/table with Gemini
+   (`uv run python scripts/e2e_smoke.py --schema restaurants --rows 1000 --llm --keep`); `make docker-up` with the UID-1000
+   image + health check; delete the throwaway dataset; tag v1.0; M7 gate verifier (check-all + README walkthrough).
 
 ## Session log (newest first)
+- **2026-08-25 (session 2)** — F6.5 per-turn Langfuse traces (42082ce); Gate M6 PASS by independent verifier (8 findings
+  recorded); F7.1 README + screenshots via headless Chrome (d89b716), verified from a clean clone → PASS, findings folded
+  in; F7.2 hardening (streamed-call retries, guard DML-in-CTE, explained chat errors, parse-error context, UID-1000 image)
+  → `make test-ui K=errors` 4 passed; F7.3 activated.
 - **2026-08-25 (session 1, cont.)** — M0 committed (`38572e8`); independent M0 gate verifier launched; F1.1 DDL
   parser → IR passing (16 tests) and committed; harness hardened after the piped-gate incident; F1.2 generation
   order with cycle breaking passing (6 tests) and committed.

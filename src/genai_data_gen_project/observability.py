@@ -95,12 +95,16 @@ def traced(
     from langfuse import get_client, propagate_attributes
 
     client = get_client()
-    attrs: dict[str, Any] = {"tags": tags or []}
-    if session_id:
-        attrs["session_id"] = session_id
     clean = {k: str(v)[:500] for k, v in metadata.items() if v is not None}
-    with (
-        client.start_as_current_observation(as_type="span", name=name),
-        propagate_attributes(**attrs, metadata=clean),
-    ):
-        yield
+    with client.start_as_current_observation(as_type="span", name=name):
+        if session_id is None and tags is None:
+            # child span: keep attributes on this observation (propagate_attributes leaks them to the trace)
+            if clean:
+                client.update_current_span(metadata=clean)
+            yield
+            return
+        attrs: dict[str, Any] = {"tags": tags or []}
+        if session_id:
+            attrs["session_id"] = session_id
+        with propagate_attributes(**attrs, metadata=clean):
+            yield

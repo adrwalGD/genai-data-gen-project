@@ -177,3 +177,28 @@ def test_settings_bound_concurrency_gate_exists() -> None:
     client, _, _ = make_client([], llm_max_concurrency=2)
     gate: Callable[[], bool] = client._gate.acquire
     assert gate() and gate() and not client._gate.acquire(blocking=False)
+
+
+def test_stream_retries_when_the_first_chunk_fails_and_classifies_mid_stream_errors() -> None:
+    client, models, sleeps = make_client(
+        [FakeError(429, "RESOURCE_EXHAUSTED"), [FakeResponse(text="a"), FakeResponse(text="b")]]
+    )
+    assert list(client.stream_text("hi")) == ["a", "b"]
+    assert len(models.calls) == 2 and len(sleeps) == 1  # first attempt failed at the first next()
+
+    def broken() -> Any:
+        yield FakeResponse(text="partial")
+        raise FakeError(503, "UNAVAILABLE")
+
+    client, _, _ = make_client([broken()])
+    pieces: list[str] = []
+    with pytest.raises(llm.LLMError) as info:
+        pieces.extend(client.stream_text("hi"))
+    assert pieces == ["partial"] and info.value.retryable and info.value.status == 503
+
+
+def test_model_content_and_404_hint_use_the_configured_default_model() -> None:
+    content = llm.model_content("earlier answer")
+    assert content.role == "model" and content.parts[0].text == "earlier answer"
+    err = llm.classify_error(FakeError(404, "Publisher Model not found"))
+    assert err.status == 404 and Settings.model_fields["gemini_model"].default in err.hint

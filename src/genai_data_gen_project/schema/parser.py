@@ -15,6 +15,7 @@ Verified AST shapes (sqlglot 30, see DECISIONS.md#2026-08-25-ddl-parsing-with-sq
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import sqlglot
@@ -31,6 +32,26 @@ OUT_DIALECT = "postgres"
 
 class DDLParseError(ValueError):
     """Raised for DDL that cannot be parsed or is semantically incomplete (e.g. FK to an unknown table)."""
+
+
+_POSITION_RE = re.compile(r"Line (\d+), Col: (\d+)")
+
+
+def error_context(ddl: str, message: str, *, radius: int = 1) -> str | None:
+    """Numbered DDL lines around the position named in a parse error ("Line N, Col: M"), with a caret."""
+    match = _POSITION_RE.search(message)
+    if match is None:
+        return None
+    line, col = int(match.group(1)), int(match.group(2))
+    lines = ddl.splitlines()
+    if not 1 <= line <= len(lines):
+        return None
+    out: list[str] = []
+    for number in range(max(1, line - radius), min(len(lines), line + radius) + 1):
+        out.append(f"{number:>4} | {lines[number - 1]}")
+        if number == line:
+            out.append("     | " + " " * max(col - 1, 0) + "^")
+    return "\n".join(out)
 
 
 _TYPE_MAP: dict[str, ColumnType] = {

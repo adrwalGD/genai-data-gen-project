@@ -38,6 +38,8 @@ Docker (full stack): `make docker-up` — mounts `~/.config/gcloud` read-only in
   `gcloud auth application-default set-quota-project gd-gcp-gridu-genai`.
 - `429 RESOURCE_EXHAUSTED` → lower `LLM_MAX_CONCURRENCY`, smaller batches; client retries with backoff.
 - `psycopg.OperationalError: connection refused` → `make db-up`; in Docker use host `postgres`.
+- `Permission denied: 'data/datasets/...'` on a local `make run` → the directory was created root-owned by an old app
+  image → `docker run --rm -v $PWD/data:/d alpine chown -R $(id -u):$(id -g) /d`; images built since F7.2 run as UID 1000.
 - Langfuse `auth_check()` False → keys belong to EU project "My Project" → `LANGFUSE_BASE_URL=https://cloud.langfuse.com`.
 - `openinference-instrumentation-google-genai` requires Python `<3.15` → stay on 3.14 until it updates.
 - `gcloud auth list` shows no accounts but calls work → ADC file exists independently of gcloud CLI login; fine.

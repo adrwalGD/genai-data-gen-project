@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -81,6 +82,10 @@ for past in st.session_state[state.SS_CHAT]:
                     else None
                 )
                 render_sql(past_item["sql"], frame, past_item.get("error"))
+                if past_item.get("truncated"):
+                    st.caption(f"Showing the first {len(past_item['rows'])} rows (result truncated).")
+                elif past_item.get("columns") is not None and not past_item.get("rows"):
+                    st.caption("The query returned no rows.")
             elif past_item["kind"] == "chart":
                 render_chart(past_item["spec"], past_item["columns"], past_item["rows"])
         if past.get("error"):
@@ -128,12 +133,16 @@ if question:
                     if event.result is not None:
                         frame = pd.DataFrame(event.result.rows, columns=event.result.columns)
                         item.update(
-                            columns=event.result.columns, rows=event.result.rows, sql=event.result.sql
+                            columns=event.result.columns,
+                            rows=event.result.rows,
+                            sql=event.result.sql,
+                            truncated=event.result.truncated,
                         )
                         last_result = (event.result.columns, event.result.rows)
                         if event.result.truncated:
-                            item["error"] = None
                             st.caption(f"Showing the first {event.result.row_count} rows (result truncated).")
+                        elif event.result.row_count == 0:
+                            st.caption("The query returned no rows.")
                     render_sql(item["sql"], frame, item["error"])
                     record["items"].append(item)
                 elif event.kind == "tool_result" and event.tool == "render_chart":
@@ -157,10 +166,9 @@ if question:
                     elif ev.kind == "final":
                         sink["answer"] = ev.text
                         sink["trace_id"] = ev.trace_id
-                    elif ev.kind == "error":
+                    elif ev.kind == "error":  # rendered once, as st.error below
                         sink["error"] = ev.text or ev.error
                         sink["trace_id"] = ev.trace_id
-                        yield ev.text
 
             streamed = st.write_stream(stream(first_text, events, record))
             record["answer"] = record["answer"] or (
@@ -173,6 +181,11 @@ if question:
                 st.caption(f"Langfuse trace: {record['trace_id']}")
         except services.UIError as e:
             record["error"] = str(e)
-            record["answer"] = record["answer"] or "I could not answer that."
             st.error(str(e))
+        except Exception as e:  # F7.2: never show a raw traceback in the chat
+            logging.getLogger(__name__).exception("talk-to-data turn failed")
+            record["error"] = (
+                f"Unexpected error ({type(e).__name__}: {str(e)[:200]}) — try again or rephrase."
+            )
+            st.error(record["error"])
     st.session_state[state.SS_CHAT].append(record)
