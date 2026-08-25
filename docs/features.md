@@ -164,16 +164,16 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F4.2 — Natural-language feedback becomes an EditPlan via Gemini
 - milestone: M4
-- state: active
+- state: passing
 - behavior: `generation.feedback.plan_edit(table, feedback, schema, llm)` turns "set all ratings below 3 to 3", "regenerate emails as firstname.lastname@example.org", "add 15 cancelled orders" into valid `EditPlan`s (structured output) that, once applied, satisfy the request and validate clean.
 - verification: `make test-llm K=feedback`
-- evidence: —
+- evidence: make test K=feedback → offline: draft→EditPlan for every op kind (incl. pattern/faker locale recipes via planner coercion), invalid drafts rejected with reasons, plan_edit retries once with the error (incl. conditional feedback without a where filter) and fails honestly twice, update_pool values fetched from the LLM and applied uniquely, recipe edits applied, sloppy filter types do not crash; make test-llm K=feedback → 3 passed with Gemini: 'set all ratings below 3 to 3' (only ratings < 3 changed), 'regenerate emails as firstname.lastname@example.org', 'add 15 cancelled orders' all applied with clean validation; make check green (2026-08-25)
 
 ## M5 — UI: Data Generation
 
 ### F5.1 — App shell with sidebar navigation
 - milestone: M5
-- state: not_started
+- state: active
 - behavior: `streamlit run src/genai_data_gen_project/ui/app.py` shows title "Data Assistant", sidebar pages "Data Generation" and "Talk to your data" via `st.navigation`; both pages render without errors with empty state and no LLM/DB configured.
 - verification: `make test-ui K=shell`
 - evidence: —

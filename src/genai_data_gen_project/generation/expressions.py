@@ -195,7 +195,10 @@ def _eval(node: ast.AST, row: Mapping[str, Any], parent: ParentLookup, rng: rand
             elif type(op) in _COMPARE:
                 if left is None or right is None:
                     return None
-                ok = _COMPARE[type(op)](_comparable(left), _comparable(right))
+                try:
+                    ok = _COMPARE[type(op)](_comparable(left), _comparable(right))
+                except TypeError:
+                    return None  # e.g. number vs string literal from a sloppy filter: unknown, not a crash
             else:
                 raise ExpressionError(f"unsupported comparison {type(op).__name__}")
             if not ok:

@@ -231,3 +231,21 @@ def _faker_values(faker: Faker, req: PoolRequest, n: int) -> list[str]:
             seen.add(candidate)
             values.append(candidate)
     return values
+
+
+def fetch_pool(
+    llm: LLMBackend, request: PoolRequest, *, temperature: float = 0.9, seed: int = 0
+) -> list[str]:
+    """Values for one pool request right now (feedback edits); Faker fills any shortfall."""
+    faker = Faker("en_US")
+    faker.seed_instance(seed)
+    try:
+        values = _llm_values(llm, request, None, temperature)
+    except LLMError as e:
+        _log.warning("pool %s.%s fell back to Faker: %s", request.table, request.column, e)
+        values = []
+    if len(values) < request.size:
+        values = _extend_unique(
+            values, _faker_values(faker, request, (request.size - len(values)) * 2), request.size
+        )
+    return values

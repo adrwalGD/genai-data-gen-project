@@ -381,3 +381,8 @@ __all__ = [
     "plan_with_llm",
 ]
 _ = ColumnPlan  # re-exported type for callers building plans by hand
+
+
+def to_recipe(override: ColumnOverride, column: Column) -> ColumnRecipe:
+    """Public entry for other modules (feedback edits): override → typed recipe; ValueError when invalid."""
+    return _to_recipe(override, column)
