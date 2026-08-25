@@ -217,14 +217,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F6.2 — Chat agent with function calling and streamed answers
 - milestone: M6
-- state: active
+- state: passing
 - behavior: `chat.agent.Agent(dataset, llm).ask(question, history)` yields events (`tool_call(run_sql|render_chart)`, `tool_result`, `text_delta`, `final`) using a manual Gemini function-calling loop (≤ 6 tool rounds), system prompt with schema summary + sample values, and streams the final answer; "How many restaurants are there?" yields a `run_sql` call and an answer containing the true count.
 - verification: `make test K=agent && make test-llm K=agent`
-- evidence: —
+- evidence: make test K=agent → 6 passed (count question yields run_sql tool_call/tool_result then streamed text deltas + final; SQL errors returned to the model for correction; render_chart uses the last result and rejects unknown columns; round cap → error event; LLMError → error event; history replayed with SQL recap; guard blocks DELETE; model payload compact and JSON-safe); make test-llm K=agent → 2 passed with Gemini on a loaded restaurants dataset: 'How many restaurants are there?' → run_sql + answer containing 60 with text deltas; 'bar chart of the 5 restaurants with the highest order revenue' → run_sql (≤ 5 rows) + render_chart spec; make check green (2026-08-25)
 
 ### F6.3 — Chart specs to plotly figures
 - milestone: M6
-- state: not_started
+- state: active
 - behavior: `chat.charts.ChartSpec` (bar/line/pie/scatter/histogram, x, y, color, title, agg) → `to_figure(spec, rows)` builds a plotly figure; invalid columns raise `ChartSpecError` with the available columns listed.
 - verification: `make test K=charts`
 - evidence: —
