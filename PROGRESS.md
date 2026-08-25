@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M1 Schema engine** — F1.1–F1.3 passing; F1.4 active. M0 gate: PASS (see Completed).
-- Latest commit: `78b5625` (feat(schema): F1.2 generation order with cycle breaking)
+- Milestone: **M1 Schema engine — all features passing (F1.1–F1.4)**; M1 gate verification pending. M0 gate: PASS.
+- Latest commit: `066f643` (feat(schema): F1.3 PostgreSQL DDL emitter)
 - `make check`: green (ruff, mypy 11 files, arch-check 7 rules, unit 5 passed, e2e 3 passed)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F1.4 (compact schema summary for prompts)
+- Active feature: none (next: F2.1 recipes + heuristic planner)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -22,6 +22,8 @@ summary plus anything that does not fit a feature entry.
       integration test · F0.4 Settings/observability + `make check-env` · F0.5 feature tooling + `make exit-check`.
 - [x] **Gate M0: PASS** 2026-08-25 at `38572e8` — independent verifier on a clean clone: setup/check/db-up/test-int/
       check-env green in 37 s (Vertex 1.5 s, Langfuse trace `1470c49ccc74e0d140c43c961f7b2c83`); 5 harness findings applied.
+- [x] M1 F1.1 DDL parser → IR (16 tests) · F1.2 generation order + cycle breaking (6) · F1.3 Postgres DDL emitter
+      (19 unit + 4 integration: 3 sample schemas created in PostgreSQL 17, constraints enforced) · F1.4 prompt summary (4).
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -44,12 +46,10 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. Run the M0 gate with an independent fresh-context verifier (docs/loop.md template); record `Gate M0: PASS/FAIL`.
-2. Activate F1.1 — `schema/models.py` (IR) + `schema/parser.py` (sqlglot, MySQL→IR) + `tests/unit/test_parser.py`
-   covering all three sample DDLs (types, nullability incl. `DATE NULL`, defaults, AUTO_INCREMENT, UNIQUE, CHECK,
-   ENUM, inline/table/ALTER FKs, `DDLParseError`).
-3. F1.2 generation order + cycle breaking (library schema cycle) → F1.3 Postgres DDL emitter (+ integration test) → F1.4 summary.
-4. M2: recipes/heuristics → expander → validator → export/datasets → loader → `scripts/e2e_smoke.py` (`make e2e`).
+0. M1 gate → independent verifier on the M1 commit; record `Gate M1`.
+1. M2: F2.1 recipes + heuristic planner → F2.2 expander → F2.3 validator → F2.4 export/datasets → F2.5 loader →
+   F2.6 `scripts/e2e_smoke.py` (`make e2e`, 3 schemas × 1000 rows, clean validator, loaded with FKs).
+2. M3 LLM planner/pools/engine; M4 feedback; M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)
 - **2026-08-25 (session 1, cont.)** — M0 committed (`38572e8`); independent M0 gate verifier launched; F1.1 DDL

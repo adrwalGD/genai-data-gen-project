@@ -67,10 +67,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F1.4 — Compact schema summary for prompts
 - milestone: M1
-- state: active
+- state: passing
 - behavior: `schema.summary.schema_summary(schema)` renders tables, columns, types, PK/FK/UNIQUE/CHECK/ENUM/NULL info in ≤ 25 lines per table; the library schema summary is under 6,000 characters.
 - verification: `make test K=summary`
-- evidence: —
+- evidence: make test K=summary → 4 passed (library summary < 6000 chars, ≤ 25 lines/table, order + deferred FK lines, PK/identity/NOT NULL/UNIQUE/DEFAULT/FK→/ENUM(|)/CHECK rendering, lowercase Postgres mode, composite FK/UNIQUE/table CHECK); make check green (2026-08-25)
 
 ## M2 — Deterministic generation core
 
