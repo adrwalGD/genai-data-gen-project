@@ -183,7 +183,7 @@ def emit_sequence_resets(schema: Schema, schema_name: str | None = None) -> list
 
 
 def emit_schema_script(schema: Schema, schema_name: str | None = None) -> str:
-    """Complete, re-runnable script: optional CREATE SCHEMA, tables, then foreign keys."""
+    """Complete script for a fresh schema: optional CREATE SCHEMA, tables, then foreign keys."""
     parts: list[str] = []
     if schema_name:
         parts.append(f"CREATE SCHEMA IF NOT EXISTS {ident(schema_name)}")

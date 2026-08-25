@@ -18,7 +18,8 @@
 
 Never: start a second feature while one is `active`; mark `passing` from memory; refactor "while at it"; leave a
 failing `make check` for "next time"; silence a test to get green; pipe a gate command (`make check | tail`
-hides the exit code — redirect to a log and test `$?`, or use `set -euo pipefail`). `features.py pass` refuses
+hides the exit code — redirect to a log and test `$?`, or use `set -euo pipefail`); chain steps without checking each
+exit code (a failed edit script followed by a commit produced a commit whose message claimed edits that never happened). `features.py pass` refuses
 unless `.harness/check.ok` (touched by a green `make check`) is newer than every source file.
 
 ## Definition of done (per feature)

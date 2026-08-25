@@ -18,7 +18,8 @@
 - `emit_tables(schema)` emits `CREATE TABLE` without FK constraints (any order); `emit_foreign_keys(schema)` emits
   `ALTER TABLE ... ADD CONSTRAINT fk_<table>_<col> FOREIGN KEY ...` for **all** FKs — added after data load so cyclic
   references load, and the database itself proves referential integrity.
-- After load: `SELECT setval(pg_get_serial_sequence('"ds_x"."T"', 'id'), COALESCE(MAX("id"),1))`.
+- After load: `SELECT setval(pg_get_serial_sequence('"ds_x"."t"', 'id'), COALESCE(MAX("id"), 0) + 1, false) FROM "ds_x"."t"`
+  (next value = max + 1, or 1 for an empty table).
 
 ## Dataset schemas
 - One schema per saved dataset: `ds_<dataset_id>` (`dataset_id` = 12 lowercase base32 chars). Reload = `DROP SCHEMA
@@ -28,6 +29,7 @@
 
 ## Read-only SQL guard (`storage/sql_guard.py`) — every user/LLM SQL passes through it
 1. `sqlglot.parse(sql, read="postgres")` must yield exactly **one** statement; parse errors → `SqlRejected(reason)`.
+   Quoted identifiers are lowercased (`"Library_Branches"` → `"library_branches"`) because tables are created lowercase.
 2. Root must be `Select`, `Union`, or a CTE whose body is Select/Union; reject `Insert/Update/Delete/Create/Drop/
    Alter/Command/Set/Copy/Truncate/Grant/...`, `SELECT ... INTO`, and function names in a denylist
    (`pg_sleep`, `pg_read_file`, `lo_*`, `dblink`, `set_config`, `pg_terminate_backend`).

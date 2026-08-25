@@ -210,9 +210,19 @@ def test_explicit_dialect_is_respected() -> None:
             "unknown column 'x'",
         ),
         ("ALTER TABLE nope ADD CONSTRAINT c FOREIGN KEY (x) REFERENCES a(id);", "not defined"),
+        ("CREATE TABLE a (id INT PRIMARY KEY, s VARCHAR(5) DEFAULT 'abc);", "Could not parse DDL"),
+        ("CREATE TABLE `a (id INT PRIMARY KEY);", "Could not parse DDL"),
     ],
 )  # fmt: skip
 def test_errors_are_actionable(ddl: str, fragment: str) -> None:
     with pytest.raises(DDLParseError) as exc_info:
         parse_ddl(ddl)
     assert fragment in str(exc_info.value)
+
+
+def test_dialect_fallback_and_unknown_types_are_reported_in_notes() -> None:
+    schema = parse_ddl("CREATE TABLE a (id INT PRIMARY KEY, name VARCHR(100));")
+    assert schema.source_dialect == "postgres"
+    assert any(n.startswith("parsed as postgres after [mysql]") for n in schema.notes)
+    assert any("unknown type 'VARCHR(100)'" in n for n in schema.notes)
+    assert parse_ddl("CREATE TABLE a (id INT PRIMARY KEY);").notes == []

@@ -97,7 +97,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F2.4 — CSV/ZIP export and dataset persistence
 - milestone: M2
-- state: not_started
+- state: active
 - behavior: `generation.export.to_csv_bytes/to_zip_bytes` produce one UTF-8 CSV per table (ISO-8601 dates, NULL as empty) and a ZIP of all; `storage.datasets.save/load/list/delete` persist `data/datasets/<id>/{manifest.json, schema.ddl, tables/*.csv}` and round-trip a dataset losslessly.
 - verification: `make test K=export or datasets`
 - evidence: —
@@ -204,7 +204,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 ### F6.1 — Read-only SQL guard and executor
 - milestone: M6
 - state: not_started
-- behavior: `storage.sql_guard.guard(sql, limit)` accepts exactly one SELECT/UNION/CTE, rejects DML/DDL/multi-statement/`INTO`/`pg_sleep`-style calls with a reason, enforces a LIMIT cap; `storage.postgres.run_readonly(dataset_id, sql)` executes in a READ ONLY transaction with `statement_timeout` and `search_path=ds_<id>` returning columns + rows.
+- behavior: `storage.sql_guard.guard(sql, limit)` accepts exactly one SELECT/UNION/CTE, rejects DML/DDL/multi-statement/`INTO`/`pg_sleep`-style calls with a reason, lowercases quoted identifiers (tables are created lowercase), enforces a LIMIT cap; `storage.postgres.run_readonly(dataset_id, sql)` executes in a READ ONLY transaction with `statement_timeout` and `search_path=ds_<id>` returning columns + rows.
 - verification: `make test K=sql_guard && make test-int K=readonly`
 - evidence: —
 

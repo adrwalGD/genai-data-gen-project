@@ -5,8 +5,10 @@ Reference an entry from code comments as `DECISIONS.md#YYYY-MM-DD-slug` when a c
 
 ## 2026-08-25: Postgres identifiers are emitted lowercase *and* quoted
 - Reason: Postgres folds unquoted identifiers to lowercase. Talk-to-data SQL written by Gemini is unpredictable about
-  quoting (`Library_Branches` vs `"Library_Branches"` vs `library_branches`). Emitting `"library_branches"` makes all
-  three spellings resolve (quoted lowercase == unquoted folded), while still allowing reserved words as names.
+  quoting (`Library_Branches` vs `"Library_Branches"` vs `library_branches`). Emitting `"library_branches"` makes
+  unquoted spellings of any case and quoted-lowercase resolve, while still allowing reserved words as names.
+  Quoted original-case (`"Library_Branches"`) does NOT resolve (verified by the M1 gate) → the SQL guard (F6.1)
+  lowercases quoted identifiers before execution and prompts use `schema_summary(lowercase=True)`.
 - The IR and CSV exports keep the original DDL spelling; only the database layer (and the prompt schema summary,
   F1.4) use lowercase. Two names differing only by case in one table → `DDLEmitError` (would collide).
 - Rejected: preserving case with quotes (breaks unquoted LLM queries); unquoted emission (breaks reserved words).

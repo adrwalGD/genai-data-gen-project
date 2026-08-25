@@ -217,9 +217,8 @@ class _SchemaBuilder:
         if dtype_name.upper() in _SERIAL_TYPES:
             col.auto_increment = True
         if ctype is ColumnType.UNKNOWN:
-            _log.warning(
-                "unknown column type %r for column %s — treated as TEXT by the emitter", dtype_name, name
-            )
+            self.notes.append(f"column {name}: unknown type {col.raw_type!r} — treated as TEXT")
+            _log.warning("unknown column type %r for column %s — treated as TEXT", col.raw_type, name)
         return col
 
     # -- table-level constraints -----------------------------------------------------------------------------
@@ -266,7 +265,9 @@ class _SchemaBuilder:
             raise DDLParseError("no CREATE TABLE statements found in the DDL")
         for table in self.tables:
             self._resolve_fks(table)
-        return Schema(tables=self.tables, source_dialect=self.dialect, ignored_statements=self.ignored)
+        return Schema(
+            tables=self.tables, source_dialect=self.dialect, ignored_statements=self.ignored, notes=self.notes
+        )
 
     def _resolve_fks(self, table: Table) -> None:
         for fk in table.foreign_keys:

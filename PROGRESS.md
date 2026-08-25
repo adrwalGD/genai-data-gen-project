@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M2 Deterministic generation core** — F2.1 active. M1 features passing (gate verification running). M0 gate: PASS.
-- Latest commit: `dbf2e1a` (feat(generation): F2.2 row expander)
-- `make check`: green (ruff, mypy 11 files, arch-check 7 rules, unit 5 passed, e2e 3 passed)
+- Milestone: **M2 Deterministic generation core** — F2.1–F2.3 passing, F2.4 active. Gates M0, M1: PASS.
+- Latest commit: `fd9bc71` (fix(schema)+harness: M1 verifier findings)
+- `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F2.3 (validator reporting every violation class)
+- Active feature: F2.4 (CSV/ZIP export + dataset persistence)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -22,6 +22,9 @@ summary plus anything that does not fit a feature entry.
       integration test · F0.4 Settings/observability + `make check-env` · F0.5 feature tooling + `make exit-check`.
 - [x] **Gate M0: PASS** 2026-08-25 at `38572e8` — independent verifier on a clean clone: setup/check/db-up/test-int/
       check-env green in 37 s (Vertex 1.5 s, Langfuse trace `1470c49ccc74e0d140c43c961f7b2c83`); 5 harness findings applied.
+- [x] **Gate M1: PASS** 2026-08-25 at `de4040a` — independent verifier: IR matched all 186 columns/25 FKs of the 3
+      DDLs by independent parsing, DDL executed in PG 17.11 with constraint counts as derived, summary claims hold; 6
+      discrepancies applied (TokenError caught, compose project name, fallback/unknown-type notes, docs corrected).
 - [x] M1 F1.1 DDL parser → IR (16 tests) · F1.2 generation order + cycle breaking (6) · F1.3 Postgres DDL emitter
       (19 unit + 4 integration: 3 sample schemas created in PostgreSQL 17, constraints enforced) · F1.4 prompt summary (4).
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
@@ -31,6 +34,8 @@ summary plus anything that does not fit a feature entry.
 - (none)
 
 ## Blocked / Known Issues
+- Lesson (2026-08-25, #2): commit `fd9bc71` claimed all M1-verifier fixes but an edit script had aborted midway and the
+  chain kept going (exit code unchecked); completed honestly in the follow-up commit. Rule added to docs/loop.md.
 - Lesson (2026-08-25): a piped `make check | tail` hid a mypy failure and F1.1 was marked passing on a red gate;
   fixed by amending the commit after a green run and by mechanical gating (`.harness/check.ok` marker required
   by `features.py pass`; see DECISIONS.md). Never pipe gate commands.
