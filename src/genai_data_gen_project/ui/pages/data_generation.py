@@ -135,6 +135,49 @@ if dataset is not None:
         st.dataframe(frame.head(200), width="stretch", hide_index=True)
         if len(frame) > 200:
             st.caption(f"Showing the first 200 of {len(frame)} rows.")
+        # --- 4. feedback on the selected table -------------------------------------------------------------
+        st.markdown(f"**Refine `{table_name}` with feedback**")
+        feedback_cols = st.columns([5, 1])
+        feedback_text = feedback_cols[0].text_input(
+            "Quick edit instructions",
+            key="feedback_text",
+            placeholder="e.g. set ratings below 3 to 3 · add 20 rows · regenerate emails as name@example.org",
+            label_visibility="collapsed",
+        )
+        submit = feedback_cols[1].button("Submit", key="feedback_submit", type="primary", width="stretch")
+        if submit:
+            try:
+                llm = services.llm_backend()
+                with st.spinner("Interpreting the feedback and updating the table…"):
+                    new_dataset, result, plan = services.run_feedback(
+                        dataset, table_name, feedback_text, llm, seed=int(st.session_state[state.SS_SEED])
+                    )
+                st.session_state[state.SS_DATASET] = new_dataset
+                st.session_state[state.SS_EDIT_LOG].append(
+                    {
+                        "table": result.table,
+                        "feedback": feedback_text,
+                        "summary": result.summary,
+                        "affected_rows": result.affected_rows,
+                        "rows": f"{result.rows_before} → {result.rows_after}",
+                        "ok": result.report.ok,
+                        "issues": [str(i) for i in result.report.issues[:5]],
+                        "ops": [op.model_dump(mode="json", exclude_none=True) for op in plan.ops],
+                    }
+                )
+                st.rerun()
+            except services.UIError as e:
+                st.error(str(e))
+        for entry in reversed(st.session_state[state.SS_EDIT_LOG]):
+            icon = "✅" if entry["ok"] else "⚠️"
+            with st.expander(
+                f"{icon} {entry['table']}: {entry['feedback']} — {entry['affected_rows']} rows affected"
+            ):
+                st.write(entry["summary"])
+                st.caption(f"rows {entry['rows']}")
+                if entry["issues"]:
+                    st.warning("\n".join(entry["issues"]))
+                st.json(entry["ops"], expanded=False)
         notes = dataset.params.get("notes", [])
         if notes or st.session_state[state.SS_GENERATION_LOG]:
             with st.expander("Generation details"):

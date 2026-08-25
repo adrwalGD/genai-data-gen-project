@@ -31,8 +31,9 @@ def _quiet_langfuse(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unit/UI tests never trace. LLM tests may opt in by setting keys themselves."""
     if os.environ.get("RUN_LLM_TESTS") != "1":
         monkeypatch.setenv("LANGFUSE_TRACING_ENABLED", "false")
-        monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
-        monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
+        # empty env vars override the .env file for pydantic-settings → Settings.langfuse_enabled is False
+        monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "")
+        monkeypatch.setenv("LANGFUSE_SECRET_KEY", "")
 
 
 @pytest.fixture

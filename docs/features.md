@@ -187,14 +187,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F5.3 — Per-table textual feedback with Submit
 - milestone: M5
-- state: active
+- state: passing
 - behavior: under the preview, a feedback text box + Submit applies an `EditPlan` to the selected table (LLM or fake backend), refreshes the preview and validation summary, and keeps an edit history visible.
 - verification: `make test-ui K=feedback_ui`
-- evidence: —
+- evidence: make test-ui K=feedback_ui → 2 passed (AppTest with injected FakeLLM: generate 30 rows/table through the LLM code path, select Reviews, Submit 'set all ratings below 3 to 3' → only ratings < 3 changed, history entry with affected rows and plan ops; select Orders, Submit 'add 10 cancelled orders' → 40 rows, 10 Cancelled, metric updated; empty feedback → hint, no history); make check green (2026-08-25)
 
 ### F5.4 — Download and save dataset for Talk-to-data
 - milestone: M5
-- state: not_started
+- state: active
 - behavior: "Download CSV (table)" and "Download ZIP (all)" buttons serve the exports; "Save dataset" persists to `data/datasets/<id>` and loads into Postgres schema `ds_<id>`, then shows the dataset id; saved datasets are listed on the Talk-to-data page.
 - verification: `make test-ui K=save_dataset && make test-int K=loader`
 - evidence: —

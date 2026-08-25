@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M5 UI — Data Generation** — F5.1–F5.2 passing, F5.3 active. M4 gate (+M3 re-check) verifier running. Gates M0, M1, M2: PASS.
+- Milestone: **M5 UI — Data Generation** — F5.1–F5.3 passing, F5.4 active. M4 gate (+M3 re-check) verifier running. Gates M0, M1, M2: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F5.3 (per-table textual feedback with Submit)
+- Active feature: F5.4 (download CSV/ZIP + save dataset to registry and Postgres)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -43,6 +43,7 @@ summary plus anything that does not fit a feature entry.
 - [x] M5 F5.1 Streamlit shell: st.navigation sidebar (Data Generation, Talk to your data), state.py, script pages, AppTest.
 - [x] M5 F5.2 Data Generation page: upload/sample/paste schema with parse feedback, instructions, temperature/rows/seed/
       Gemini toggle, Generate with st.status progress, per-table preview + validation summary + details.
+- [x] M5 F5.3 per-table feedback: quick-edit box + Submit → Gemini EditPlan applied, preview refreshed, history with ops.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -75,7 +76,7 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. M5 UI: F5.3 feedback → F5.4 download/save → F5.5 Docker.
+1. M5 UI: F5.4 download/save → F5.5 Docker.
 2. Run the M4 gate verifier (incl. M3 re-check: pools yield, batch isolation, row cap); record Gate M3/M4.
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 

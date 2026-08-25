@@ -13,7 +13,7 @@ from pathlib import Path
 import streamlit as st
 
 from genai_data_gen_project.config import Settings, get_settings
-from genai_data_gen_project.generation import engine
+from genai_data_gen_project.generation import engine, feedback
 from genai_data_gen_project.generation.expander import ExpansionError
 from genai_data_gen_project.llm.client import LLMBackend, LLMError
 from genai_data_gen_project.schema.order import UnsatisfiableSchemaError
@@ -103,3 +103,21 @@ def run_generation(
         raise UIError(f"Row generation failed: {e}") from e
     except LLMError as e:
         raise UIError(f"Gemini failed: {e} — switch off 'Use Gemini' to generate offline") from e
+
+
+def run_feedback(
+    dataset: Dataset, table: str, text: str, llm: LLMBackend | None, *, seed: int = 0
+) -> tuple[Dataset, feedback.EditResult, feedback.EditPlan]:
+    """Textual feedback on one table → Gemini EditPlan → applied dataset; UI-friendly errors."""
+    if not text.strip():
+        raise UIError("Type what should change in the selected table before clicking Submit.")
+    if llm is None:
+        raise UIError("Textual feedback needs Gemini to interpret it — switch on 'Use Gemini' and try again.")
+    try:
+        return feedback.apply_feedback(dataset, table, text, llm, seed=seed)
+    except feedback.EditError as e:
+        raise UIError(f"The feedback could not be applied: {e}") from e
+    except ExpansionError as e:
+        raise UIError(f"Applying the feedback failed while regenerating values: {e}") from e
+    except LLMError as e:
+        raise UIError(f"Gemini failed while interpreting the feedback: {e}") from e
