@@ -40,6 +40,7 @@ from .recipes import (
 )
 
 _log = logging.getLogger(__name__)
+MAX_ROW_MULTIPLIER = 5  # planner may grow a table to at most 5x the requested rows
 
 OverrideKind = Literal[
     "int_range",
@@ -120,8 +121,8 @@ Rules:
   phone_number, postcode, country, url, isbn13, sentence, paragraph, catch_phrase, word) for generic values;
   use pattern for formatted codes ("#"=digit, "?"=lowercase letter, "%"=uppercase letter, {col:other|slug},
   {seq}).
-- Row counts: change table_rows only when the instructions ask for it or realism demands it (e.g. many order
-  items per order); otherwise keep the requested default.
+- Row counts: keep the requested default unless the instructions ask for more or realism demands it (e.g.
+  several order items per order); never more than 5x the default — larger requests are clamped.
 - Localization: Faker providers are English/US unless you set `locale` (e.g. pl_PL, de_DE, fr_FR) on a faker
   override — use it for names, addresses and cities of a given country. For culture-specific titles, dishes or
   descriptions use text_pool with a brief and 3-5 examples in the requested language.
@@ -199,6 +200,13 @@ def merge(
             notes.append(f"dropped row count for unknown table {tr.table!r}")
             continue
         rows = tr.rows
+        relative_cap = tp.rows * MAX_ROW_MULTIPLIER
+        if rows > relative_cap:
+            notes.append(
+                f"row count for {tp.table} clamped to {relative_cap} "
+                f"({MAX_ROW_MULTIPLIER}x the requested {tp.rows}; planner asked for {rows})"
+            )
+            rows = relative_cap
         if max_rows is not None and rows > max_rows:
             notes.append(f"row count for {tp.table} clamped to {max_rows} (planner asked for {rows})")
             rows = max_rows

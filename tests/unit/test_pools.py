@@ -53,7 +53,7 @@ def test_fill_pools_batches_dedupes_and_truncates(sample_ddl: dict[str, str]) ->
     assert len(title_calls) == 3  # 50 + 50 + 20
     assert "Generate 20 distinct values" in title_calls[-1]["contents"]
     assert "User instructions for the whole dataset: Polish books" in title_calls[0]["contents"]
-    assert "Already used (avoid)" in title_calls[1]["contents"] and title_calls[0]["temperature"] == 0.5
+    assert "Already used" in title_calls[1]["contents"] and title_calls[0]["temperature"] == 0.5
     assert result.fallback_values == 0 and result.llm_values > 0 and result.notes == []
     tables = expand(schema, plan, seed=1, pools=result.pools)
     assert validate(schema, tables).ok and set(tables["Books"]["title"]) == set(titles)
@@ -126,3 +126,24 @@ def test_worker_threads_inherit_the_callers_context() -> None:
     probe.set("from-main-thread")
     pools.fill_pools(plan, schema, FakeLLM(json_responses={"TextPool": respond}), max_workers=3)
     assert seen and all(v == "from-main-thread" for v in seen)
+
+
+def test_one_bad_batch_costs_one_batch_not_the_pool() -> None:
+    calls = {"n": 0}
+
+    def respond(prompt: str) -> dict:  # type: ignore[type-arg]
+        calls["n"] += 1
+        if calls["n"] in (2, 3):  # second batch fails, and so does its single retry
+            raise LLMError("Gemini returned invalid JSON", hint="smaller batches")
+        n = int(re.search(r"Generate (\d+) distinct values", prompt).group(1))  # type: ignore[union-attr]
+        return {"values": [f"Title {calls['n']}-{i}" for i in range(n)]}
+
+    schema = parse_ddl("CREATE TABLE Books (id INT PRIMARY KEY, title VARCHAR(80) NOT NULL);")
+    plan = heuristics.plan(schema, 120)
+    result = pools.fill_pools(plan, schema, FakeLLM(json_responses={"TextPool": respond}), max_workers=1)
+    titles = result.pools[("Books", "title")]
+    assert len(titles) == 120 and len(set(titles)) == 120
+    assert (
+        result.llm_values == 120 and result.fallback_values == 0
+    )  # the failed batch was replaced by a later one
+    assert any("a batch of 50 values failed" in n for n in result.notes)

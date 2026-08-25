@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import contextvars
 import logging
+import math
+import random
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -128,17 +130,19 @@ def fill_pools(
         result.notes.append(f"text pools filled by Faker for {len(requests)} column(s) (no LLM)")
         return result
 
-    def work(req: PoolRequest) -> tuple[PoolRequest, list[str], str | None]:
+    def work(req: PoolRequest) -> tuple[PoolRequest, list[str], list[str], str | None]:
         try:
-            return req, _llm_values(llm, req, instructions, temperature), None
+            values, batch_notes = _llm_values(llm, req, instructions, temperature)
+            return req, values, batch_notes, None
         except LLMError as e:
-            return req, [], str(e)
+            return req, [], [], str(e)
 
     with ThreadPoolExecutor(max_workers=max(1, max_workers)) as pool:
         # copy the caller's context per task so OpenTelemetry spans (Langfuse) nest under the current trace
         futures = [pool.submit(contextvars.copy_context().run, work, req) for req in requests]
         for future in futures:
-            req, values, error = future.result()
+            req, values, batch_notes, error = future.result()
+            result.notes.extend(batch_notes)
             if error:
                 result.notes.append(f"{req.table}.{req.column}: pool fell back to Faker — {error}")
             result.llm_values += min(len(values), req.size)  # counted before any Faker top-up
@@ -157,15 +161,30 @@ def fill_pools(
 
 
 # --- LLM side -------------------------------------------------------------------------------------
-def _llm_values(llm: LLMBackend, req: PoolRequest, instructions: str | None, temperature: float) -> list[str]:
+def _llm_values(
+    llm: LLMBackend, req: PoolRequest, instructions: str | None, temperature: float
+) -> tuple[list[str], list[str]]:
+    """Distinct values from the model; a bad batch costs one batch, not the pool. Returns (values, notes)."""
     values: list[str] = []
+    notes: list[str] = []
     rounds = 0
+    failed_batches = 0
     while len(values) < req.size and rounds <= MAX_ROUNDS:
         remaining = req.size - len(values)
-        batch_sizes = [min(BATCH_SIZE, remaining - i) for i in range(0, remaining, BATCH_SIZE)]
-        for n in batch_sizes:
-            prompt = _prompt(req, n, instructions, avoid=values[-12:])
-            data = llm.generate_json(POOL_SCHEMA, prompt, system=POOL_SYSTEM, temperature=temperature)
+        ask = math.ceil(
+            remaining * (1.3 if rounds else 1.0)
+        )  # duplicates are common in top-up rounds: over-request
+        for n in [min(BATCH_SIZE, ask - i) for i in range(0, ask, BATCH_SIZE)]:
+            avoid = values if len(values) <= 40 else random.Random(len(values)).sample(values, 40)
+            prompt = _prompt(req, n, instructions, avoid=avoid)
+            try:
+                data = _batch(llm, prompt, temperature)
+            except LLMError as e:
+                failed_batches += 1
+                notes.append(f"{req.table}.{req.column}: a batch of {n} values failed ({e.message[:120]})")
+                if failed_batches >= 3:
+                    raise  # systematic failure → the caller falls back to Faker for this pool
+                continue
             raw = data.get("values", []) if isinstance(data, dict) else []
             values = _extend_unique(
                 values, [str(v) for v in raw if isinstance(v, str | int | float)], req.size, req.max_length
@@ -173,7 +192,20 @@ def _llm_values(llm: LLMBackend, req: PoolRequest, instructions: str | None, tem
             if len(values) >= req.size:
                 break
         rounds += 1
-    return values
+    return values, notes
+
+
+def _batch(llm: LLMBackend, prompt: str, temperature: float) -> Any:
+    """One batch call with a single retry (the client retries transport errors; this covers bad JSON)."""
+    try:
+        return llm.generate_json(POOL_SCHEMA, prompt, system=POOL_SYSTEM, temperature=temperature)
+    except LLMError as first:
+        if first.retryable:
+            raise
+        _log.warning("pool batch failed (%s); retrying once at a lower temperature", first.message)
+        return llm.generate_json(
+            POOL_SCHEMA, prompt, system=POOL_SYSTEM, temperature=max(0.3, temperature - 0.3)
+        )
 
 
 def _prompt(req: PoolRequest, n: int, instructions: str | None, avoid: list[str]) -> str:
@@ -189,7 +221,7 @@ def _prompt(req: PoolRequest, n: int, instructions: str | None, avoid: list[str]
     if instructions and instructions.strip():
         parts.append(f"User instructions for the whole dataset: {instructions.strip()}")
     if avoid:
-        parts.append("Already used (avoid): " + "; ".join(avoid))
+        parts.append("Already used — do not repeat these or near-duplicates: " + "; ".join(avoid))
     return "\n".join(parts)
 
 
@@ -240,7 +272,7 @@ def fetch_pool(
     faker = Faker("en_US")
     faker.seed_instance(seed)
     try:
-        values = _llm_values(llm, request, None, temperature)
+        values, _notes = _llm_values(llm, request, None, temperature)
     except LLMError as e:
         _log.warning("pool %s.%s fell back to Faker: %s", request.table, request.column, e)
         values = []

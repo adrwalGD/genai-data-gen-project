@@ -276,7 +276,7 @@ def constant_problem(col: Column, value: str | int | float | bool | None) -> str
     try:
         csvio.parse_value(col, str(value))
     except csvio.CsvFormatError as e:
-        return str(e)
+        return str(e).split(": [")[0]
     return None
 
 

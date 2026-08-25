@@ -166,8 +166,11 @@ def test_m3_verifier_findings_constant_coercion_pool_inheritance_locale_and_row_
     assert "hire_date (constant): invalid parameters: constant 'not a date' does not fit DATE" in notes
     assert "hours_worked (constant): invalid parameters: constant 'many'" in notes
     assert "last_name (faker): unknown Faker locale 'xx_NOPE'" in notes
-    assert "row count for Employee_Projects clamped to 5000 (planner asked for 999999)" in notes
-    assert plan.table("Employee_Projects").rows == 5000  # type: ignore[union-attr]
+    assert (
+        "row count for Employee_Projects clamped to 250 (5x the requested 50; planner asked for 999999)"
+        in notes
+    )
+    assert plan.table("Employee_Projects").rows == 250  # type: ignore[union-attr]
     coverage = plan.table("Employee_Benefits").column("coverage_amount").recipe  # type: ignore[union-attr]
     assert coverage.kind == "constant" and coverage.value == "1200.50"  # type: ignore[union-attr]
     name = plan.table("Projects").column("name").recipe  # type: ignore[union-attr]
