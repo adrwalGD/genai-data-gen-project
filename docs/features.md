@@ -238,16 +238,16 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F6.5 — Per-turn Langfuse traces
 - milestone: M6
-- state: active
+- state: passing
 - behavior: each question produces a Langfuse trace `talk_to_data_turn` with `session_id` = Streamlit session id, tags `[talk-to-data]`, nested GENERATION spans for every Gemini call and a span per tool execution; the trace id is shown in a small caption in the UI.
 - verification: `make test-llm K=trace`
-- evidence: —
+- evidence: make check: 205 unit + 12 e2e green; make test-llm K='trace or agent': 3 passed in 32.9s — tests/llm/test_trace.py asserts via Langfuse API: trace talk_to_data_turn, sessionId trace-test, tag talk-to-data, span tool.run_sql, >=2 GENERATIONs (e.g. trace e04f086b2d81c22612ae6678a1f08a57)
 
 ## M7 — Hardening & presentation
 
 ### F7.1 — README and demo walkthrough
 - milestone: M7
-- state: not_started
+- state: active
 - behavior: README covers purpose, architecture (diagram), prerequisites (gcloud ADC), setup (`make setup`), run (local + Docker), verification commands, a 5-minute demo script for the professor and screenshots; a fresh reader can run the app following only the README.
 - verification: independent verifier follows README from a clean clone and reports PASS
 - evidence: —

@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M6 Talk to your data** — F6.1–F6.4 passing, F6.5 active. Gates M0–M5: PASS.
+- Milestone: **M6 Talk to your data** — F6.1–F6.5 passing; M6 gate verifier pending. M7 F7.1 active. Gates M0–M5: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F6.5 (per-turn Langfuse traces)
+- Active feature: F7.1 (README + demo walkthrough)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -60,6 +60,11 @@ summary plus anything that does not fit a feature entry.
       events (SQL expanders, result tables, plotly charts, streamed answers), clear chat, offline hint.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
+- [x] M6 F6.5 Per-turn Langfuse traces: `Agent.ask` = trace `talk_to_data_turn` (session_id = UI session id from
+  `state.SS_SESSION_ID`, tag `talk-to-data`, dataset_id/question metadata), a span `tool.<name>` per tool execution
+  with the arguments, GENERATIONs nested by the instrumentor, `flush()` per turn; trace id on the final/error event and
+  `agent.last_trace_id`; UI caption "Langfuse trace: <id>". Live test tests/llm/test_trace.py checks the Langfuse API
+  (trace e04f086b2d81c22612ae6678a1f08a57: session trace-test, span tool.run_sql, 3 GENERATIONs).
 
 ## In Progress
 - (none)
@@ -98,9 +103,8 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. M6 Talk to your data: F6.5 per-turn Langfuse traces → M6 gate verifier.
-2. M7 hardening: README/demo script, error UX (incl. verifier nits), `make check-all`, demo dataset, v1.0 tag.
-3. M5/M6 UI; M7 hardening (docs/PLAN.md).
+1. M6 gate verifier (fresh-context agent on the F6.5 commit) → record Gate M6.
+2. M7 hardening: F7.1 README + demo walkthrough (active) → F7.2 actionable errors/UX polish → F7.3 check-all + demo dataset + v1.0 tag.
 
 ## Session log (newest first)
 - **2026-08-25 (session 1, cont.)** — M0 committed (`38572e8`); independent M0 gate verifier launched; F1.1 DDL

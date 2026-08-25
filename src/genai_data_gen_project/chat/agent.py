@@ -14,6 +14,7 @@ from typing import Any, Literal
 
 from ..config import Settings, get_settings
 from ..llm.client import LLMBackend, LLMError, function_response, user_content
+from ..observability import current_trace_id, flush, traced
 from ..schema.models import Schema
 from ..schema.summary import schema_summary
 from ..storage import postgres
@@ -31,6 +32,7 @@ class AgentEvent:
     result: postgres.QueryResult | None = None
     chart: dict[str, Any] | None = None
     error: str | None = None
+    trace_id: str | None = None
 
 
 @dataclass
@@ -67,7 +69,12 @@ class Agent:
         settings: Settings | None = None,
         max_tool_rounds: int = 6,
         temperature: float = 0.0,
+        session_id: str | None = None,
+        dataset_id: str | None = None,
     ) -> None:
+        self.session_id = session_id
+        self.dataset_id = dataset_id
+        self.last_trace_id: str | None = None
         self.llm = llm
         self.executor = executor
         self.settings = settings or get_settings()
@@ -77,13 +84,39 @@ class Agent:
 
     @classmethod
     def for_dataset(
-        cls, dataset_id: str, schema: Schema, llm: LLMBackend, settings: Settings | None = None
+        cls,
+        dataset_id: str,
+        schema: Schema,
+        llm: LLMBackend,
+        settings: Settings | None = None,
+        *,
+        session_id: str | None = None,
     ) -> Agent:
         settings = settings or get_settings()
-        return cls(schema, llm, tools.make_executor(dataset_id, settings), settings=settings)
+        executor = tools.make_executor(dataset_id, settings)
+        return cls(schema, llm, executor, settings=settings, session_id=session_id, dataset_id=dataset_id)
 
     def ask(self, question: str, history: list[Turn] | None = None) -> Iterator[AgentEvent]:
-        """Yield events for one question; the last event is `final` (with the full answer) or `error`."""
+        """Yield events for one question; the last event is `final` (with the full answer) or `error`.
+
+        Every turn is one Langfuse trace `talk_to_data_turn` (session id = UI session, tag talk-to-data)
+        with a span per tool execution and a GENERATION per Gemini call; the trace id rides on the final/error
+        event and on `self.last_trace_id`. Tracing is a no-op when Langfuse is not configured.
+        """
+        with traced(
+            "talk_to_data_turn",
+            session_id=self.session_id,
+            tags=["talk-to-data"],
+            dataset_id=self.dataset_id,
+            question=question[:300],
+        ):
+            self.last_trace_id = current_trace_id()
+            try:
+                yield from self._ask(question, history)
+            finally:
+                flush()
+
+    def _ask(self, question: str, history: list[Turn] | None) -> Iterator[AgentEvent]:
         contents: list[Any] = []
         for turn in (history or [])[-6:]:
             contents.append(user_content(turn.question))
@@ -102,7 +135,8 @@ class Agent:
                     contents.append(reply.content)
                 for call in reply.calls:
                     yield AgentEvent("tool_call", tool=call.name, args=call.args)
-                    outcome = tools.dispatch(call.name, call.args, self.executor, last_result)
+                    with traced(f"tool.{call.name}", **_span_args(call.args)):
+                        outcome = tools.dispatch(call.name, call.args, self.executor, last_result)
                     if outcome.result is not None:
                         last_result = outcome.result
                     chart = (
@@ -125,6 +159,7 @@ class Agent:
                     "error",
                     error=f"stopped after {self.max_tool_rounds} tool rounds without a final answer",
                     text="I could not finish answering — please rephrase or make the question more specific.",
+                    trace_id=self.last_trace_id,
                 )
                 return
             pieces: list[str] = []
@@ -133,9 +168,19 @@ class Agent:
             ):
                 pieces.append(delta)
                 yield AgentEvent("text_delta", text=delta)
-            yield AgentEvent("final", text="".join(pieces).strip())
+            yield AgentEvent("final", text="".join(pieces).strip(), trace_id=self.last_trace_id)
         except LLMError as e:
-            yield AgentEvent("error", error=str(e), text=f"Gemini failed: {e.message} — {e.hint}")
+            yield AgentEvent(
+                "error",
+                error=str(e),
+                text=f"Gemini failed: {e.message} — {e.hint}",
+                trace_id=self.last_trace_id,
+            )
+
+
+def _span_args(args: dict[str, Any]) -> dict[str, Any]:
+    """Tool arguments as short string attributes for the tool span (SQL text, chart spec fields)."""
+    return {f"arg_{k}": str(v)[:500] for k, v in args.items()}
 
 
 def _model_text(text: str) -> Any:

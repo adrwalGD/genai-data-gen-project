@@ -132,3 +132,20 @@ def test_model_payload_is_compact_and_json_safe() -> None:
     unknown = tools.dispatch("teleport", {}, fake_executor, None)
     assert unknown.error and "unknown tool" in unknown.error
     assert agent_module.SYSTEM_PROMPT.startswith("You are a data analyst")
+
+
+def test_trace_ids_are_none_without_langfuse_and_session_is_kept(sample_ddl: dict[str, str]) -> None:
+    fake = FakeLLM(
+        tool_turns=[tool_call("run_sql", sql="SELECT count(*) AS n FROM restaurants")], final_text="60."
+    )
+    agent = Agent(
+        parse_ddl(sample_ddl["restaurants"]),
+        fake,
+        fake_executor,
+        settings=settings(),
+        session_id="s-1",
+        dataset_id="abc",
+    )
+    events = list(agent.ask("count"))
+    assert agent.session_id == "s-1" and agent.dataset_id == "abc"
+    assert events[-1].kind == "final" and events[-1].trace_id is None and agent.last_trace_id is None

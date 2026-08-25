@@ -6,6 +6,7 @@ or a pasted DDL) before the first `AppTest.run()`.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -27,6 +28,7 @@ SS_EDIT_LOG = "edit_log"  # applied feedback summaries
 SS_ACTIVE_DATASET_ID = "active_dataset_id"  # Talk-to-data: selected saved dataset
 SS_CHAT = "chat_history"  # Talk-to-data: list of turns
 SS_LAST_ERROR = "last_error"
+SS_SESSION_ID = "session_id"  # stable per browser session; becomes the Langfuse session id (F6.5)
 
 DEFAULTS: dict[str, Any | Callable[[], Any]] = {
     SS_DDL_TEXT: "",
@@ -45,6 +47,7 @@ DEFAULTS: dict[str, Any | Callable[[], Any]] = {
     SS_ACTIVE_DATASET_ID: None,
     SS_CHAT: list,
     SS_LAST_ERROR: None,
+    SS_SESSION_ID: lambda: uuid.uuid4().hex[:12],
 }
 
 

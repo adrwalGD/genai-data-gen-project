@@ -156,8 +156,10 @@ if question:
                         yield ev.text
                     elif ev.kind == "final":
                         sink["answer"] = ev.text
+                        sink["trace_id"] = ev.trace_id
                     elif ev.kind == "error":
                         sink["error"] = ev.text or ev.error
+                        sink["trace_id"] = ev.trace_id
                         yield ev.text
 
             streamed = st.write_stream(stream(first_text, events, record))
@@ -166,7 +168,9 @@ if question:
             )
             if record["error"]:
                 st.error(record["error"])
-            record["trace_id"] = getattr(agent, "last_trace_id", None)
+            record["trace_id"] = record["trace_id"] or agent.last_trace_id
+            if record["trace_id"]:
+                st.caption(f"Langfuse trace: {record['trace_id']}")
         except services.UIError as e:
             record["error"] = str(e)
             record["answer"] = record["answer"] or "I could not answer that."

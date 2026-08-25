@@ -183,4 +183,5 @@ def agent_for(dataset_id: str) -> Agent:
     except datasets.DatasetNotFound as e:
         raise UIError(f"Dataset {dataset_id!r} is not in the registry anymore — save a dataset first.") from e
     executor = st.session_state.get(state.SS_SQL_EXECUTOR) or tools.make_executor(dataset_id, cfg)
-    return Agent(schema, llm, executor, settings=cfg)
+    session_id = st.session_state.get(state.SS_SESSION_ID)
+    return Agent(schema, llm, executor, settings=cfg, session_id=session_id, dataset_id=dataset_id)

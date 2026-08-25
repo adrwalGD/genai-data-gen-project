@@ -80,3 +80,11 @@ lf.flush()   # after each user action (Streamlit is long-lived) so traces show u
 - Verified via API: trace `harness-probe-2` with `sessionId`, `userId`, `tags`, input/output and a nested
   GENERATION `GenerateContent` model `gemini-2.5-flash` usage total 6.
 - Tracing must be optional: no keys → no instrumentation, no warnings in unit tests.
+
+### Talk-to-data traces (F6.5, verified live)
+- One trace per question: `observability.traced("talk_to_data_turn", session_id=<UI session id>, tags=["talk-to-data"], ...)`
+  around `Agent.ask`; `current_trace_id()` is read inside the span and returned on the final/error event.
+- Tool executions are child spans `tool.run_sql` / `tool.render_chart` (arguments as `arg_*` attributes). Do NOT pass
+  `tags=` to child spans — Langfuse tags are trace-level and a child tag leaks onto the trace.
+- GENERATIONs come from the openinference instrumentor (`GenerateContent`, `GenerateContentStream`); `flush()` after
+  every turn so short-lived sessions still export.

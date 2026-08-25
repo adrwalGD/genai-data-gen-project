@@ -13,7 +13,7 @@ system so that the professor demo can be given from any closed milestone onward.
 | M3 | LLM-powered generation | Adds realism + user instructions + temperature on top of a proven core. | `make check && make test-llm && make e2e-llm E2E_ARGS="--schema restaurants --rows 200"` + Langfuse trace id recorded |
 | M4 | Feedback edits | Spec: "modify the data through textual feedback". Needs M3 planner types. | `make test K=feedback` + `make test-llm K=feedback` (3 feedback styles) |
 | M5 | UI — Data Generation tab | First visible deliverable; wires M1–M4. Dockerized run. | `make test-ui` + `make docker-up` → `curl :8501/_stcore/health` = ok + manual run notes |
-| M6 | UI — Talk to your data | Phases 2–3: NL → SQL (function calling), tables, plots, streaming, traces. | `make test K=chat` + `make test-llm K=chat` + `make test-ui` |
+| M6 | UI — Talk to your data | Phases 2–3: NL → SQL (function calling), tables, plots, streaming, traces. | `make test K='agent or tools or charts or sql_guard or readonly'` + `make test-llm K='agent or trace'` + `make test-ui` |
 | M7 | Hardening & presentation | README, error UX, demo dataset, final full gate. | `make check-all` green; README walkthrough reproduced by verifier |
 
 ## M0 — Initialization (no business code)
