@@ -90,10 +90,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F2.3 — Validator reports every violation class
 - milestone: M2
-- state: not_started
+- state: passing
 - behavior: `generation.validator.validate(schema, tables)` returns `ValidationReport(ok, issues)` detecting PK duplicates, dangling FKs, NOT NULL violations, ENUM/CHECK violations, VARCHAR overflow, DECIMAL scale/precision overflow, invalid dates; clean on expander output; each negative case produces exactly one issue with examples.
 - verification: `make test K=validator`
-- evidence: —
+- evidence: make test K=validator → 17 passed (expander output for 3 schemas validates clean incl. expected_rows; single injected violations each yield exactly one issue: check, not_null, type, enum, varchar_length, decimal_scale, decimal_precision, fk_dangling, date_invalid, boolean type; pk_duplicate + unique with resulting dangling children detected; columns_mismatch/missing_table/row_count; multi-column CHECK end_date >= start_date evaluated, LENGTH() check reported as unsupported note; summary text); make check green (2026-08-25)
 
 ### F2.4 — CSV/ZIP export and dataset persistence
 - milestone: M2
