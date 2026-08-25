@@ -8,8 +8,6 @@ Same schema + plan + seed + pools → identical output.
 
 from __future__ import annotations
 
-import ast
-import operator
 import random
 import re
 import unicodedata
@@ -17,15 +15,17 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from faker import Faker
 
 from ..schema.models import Column, ColumnType, Schema, Table
 from ..schema.order import GenerationOrder, generation_order
+from .expressions import Compiled, NullResult, compile_expression, parse_parent_ref
 from .heuristics import check_bounds
 from .recipes import (
+    AggregateRecipe,
     BooleanRecipe,
     ColumnPlan,
     ConstantRecipe,
@@ -64,6 +64,15 @@ class _Context:
     faker: Faker
     tables: dict[str, pd.DataFrame] = field(default_factory=dict)
     pools: dict[PoolKey, list[str]] = field(default_factory=dict)
+    indexes: dict[tuple[str, str], dict[Value, int]] = field(default_factory=dict)
+
+    def parent_index(self, table: str, column: str) -> dict[Value, int]:
+        key = (table.lower(), column.lower())
+        if key not in self.indexes:
+            frame = self.tables[table]
+            col = next(c for c in frame.columns if c.lower() == column.lower())
+            self.indexes[key] = {v: i for i, v in enumerate(frame[col].tolist()) if v is not None}
+        return self.indexes[key]
 
 
 def expand(
@@ -90,6 +99,7 @@ def expand(
         deferred_cols.extend((table, c) for c in table.column_names if c.lower() in deferred)
     for table, column in deferred_cols:
         _fill_deferred(ctx, schema, table, column, plan)
+    _fill_aggregates(ctx, schema, plan)
     return {t.name: ctx.tables[t.name] for t in schema.tables}
 
 
@@ -125,9 +135,13 @@ def _column_order(table: Table, plans: dict[str, ColumnPlan]) -> list[Column]:
         if isinstance(r, PatternRecipe):
             refs = re.findall(r"\{col:([A-Za-z_][A-Za-z0-9_]*)", r.template)
         elif isinstance(r, DerivedRecipe):
-            refs = _expression_names(r.expression)
+            try:
+                refs = compile_expression(r.expression).dependencies
+            except ValueError as e:
+                raise ExpansionError(f"{table.name}.{col.name}: {e}") from e
         elif isinstance(r, DateWindowRecipe | DateTimeWindowRecipe) and r.after_column:
-            refs = [r.after_column]
+            parent_ref = parse_parent_ref(r.after_column)
+            refs = [parent_ref[0]] if parent_ref else [r.after_column]
         for ref in refs:
             if not table.has_column(ref):
                 raise ExpansionError(f"{table.name}.{col.name}: recipe references unknown column {ref!r}")
@@ -178,6 +192,8 @@ def _generate_column(
         return [rng.random() < r.true_ratio for _ in range(n)]
     if isinstance(r, ConstantRecipe):
         return [r.value] * n
+    if isinstance(r, AggregateRecipe):
+        return [r.default] * n  # replaced by _fill_aggregates once the children exist
     if isinstance(r, FakerRecipe):
         provider = _faker_provider(ctx.faker, r.provider)
         return _unique_or_not(ctx, col, n, lambda _i: provider(**r.kwargs), r.unique)
@@ -187,18 +203,53 @@ def _generate_column(
         renderer = _compile_pattern(ctx, table, r.template, generated)
         return _unique_or_not(ctx, col, n, renderer, r.unique)
     if isinstance(r, DateWindowRecipe):
-        return [_date_value(rng, r, _row_ref(generated, table, r.after_column, i)) for i in range(n)]
+        return [
+            _date_value(rng, r, _row_ref(ctx, schema, table, generated, r.after_column, i), col.nullable)
+            for i in range(n)
+        ]
     if isinstance(r, DateTimeWindowRecipe):
-        return [_datetime_value(rng, r, _row_ref(generated, table, r.after_column, i)) for i in range(n)]
+        return [
+            _datetime_value(rng, r, _row_ref(ctx, schema, table, generated, r.after_column, i), col.nullable)
+            for i in range(n)
+        ]
     if isinstance(r, DerivedRecipe):
-        return _derived_values(ctx, table, col, r.expression, n, generated)
+        return _derived_values(ctx, schema, table, col, r.expression, n, generated)
     raise ExpansionError(f"{table.name}.{col.name}: unsupported recipe {type(r).__name__}")
 
 
-def _row_ref(generated: dict[str, list[Value]], table: Table, column: str | None, i: int) -> Value:
-    if not column:
+def _row_ref(
+    ctx: _Context, schema: Schema, table: Table, generated: dict[str, list[Value]], ref: str | None, i: int
+) -> Value:
+    if not ref:
         return None
-    return generated[table.column(column).name][i]
+    parent_ref = parse_parent_ref(ref)
+    if parent_ref is None:
+        return generated[table.column(ref).name][i]
+    fk_col, col = parent_ref
+    return _parent_value(ctx, schema, table, generated, fk_col, col, i)
+
+
+def _parent_value(
+    ctx: _Context,
+    schema: Schema,
+    table: Table,
+    generated: dict[str, list[Value]],
+    fk_col: str,
+    col: str,
+    i: int,
+) -> Value:
+    fk = table.fk_for_column(fk_col)
+    if fk is None:
+        raise ExpansionError(f"{table.name}: parent({fk_col}) is not a foreign key column")
+    value = generated[table.column(fk_col).name][i]
+    if value is None:
+        return None
+    parent = schema.table(fk.ref_table)
+    ref_col = parent.column(fk.ref_columns[fk.columns.index(table.column(fk_col).name)]).name
+    row = ctx.parent_index(parent.name, ref_col).get(value)
+    if row is None:
+        return None
+    return cast(Value, ctx.tables[parent.name][parent.column(col).name].iat[row])
 
 
 def _unit(rng: random.Random, dist: Distribution) -> float:
@@ -369,17 +420,21 @@ def _compile_pattern(
     return render
 
 
-def _date_value(rng: random.Random, r: DateWindowRecipe, base: Value) -> date:
+def _date_value(rng: random.Random, r: DateWindowRecipe, base: Value, nullable: bool = False) -> date | None:
     base_date = base.date() if isinstance(base, datetime) else base if isinstance(base, date) else None
     if base_date is not None:
-        lo = base_date + timedelta(days=r.min_days_after)
+        lo = max(base_date + timedelta(days=r.min_days_after), r.start)
+        if lo > r.end:  # the earliest allowed moment lies beyond the window: has not happened yet
+            return None if nullable else r.end
         hi = base_date + timedelta(days=r.max_days_after) if r.max_days_after is not None else r.end
-        hi = min(hi, r.end) if hi >= lo else lo
+        hi = min(hi, r.end) if hi >= lo else r.end  # an explicit window wins over the max-gap preference
         return lo + timedelta(days=rng.randint(0, (hi - lo).days)) if hi > lo else lo
     return r.start + timedelta(days=rng.randint(0, (r.end - r.start).days))
 
 
-def _datetime_value(rng: random.Random, r: DateTimeWindowRecipe, base: Value) -> datetime:
+def _datetime_value(
+    rng: random.Random, r: DateTimeWindowRecipe, base: Value, nullable: bool = False
+) -> datetime | None:
     base_dt = (
         base
         if isinstance(base, datetime)
@@ -388,85 +443,45 @@ def _datetime_value(rng: random.Random, r: DateTimeWindowRecipe, base: Value) ->
         else None
     )
     if base_dt is not None:
-        lo = base_dt + timedelta(hours=r.min_hours_after)
+        lo = max(base_dt + timedelta(hours=r.min_hours_after), r.start)
+        if lo > r.end:  # the earliest allowed moment lies beyond the window: has not happened yet
+            return None if nullable else r.end
         hi = base_dt + timedelta(hours=r.max_hours_after) if r.max_hours_after is not None else r.end
-        hi = min(hi, r.end) if hi >= lo else lo
+        hi = min(hi, r.end) if hi >= lo else r.end  # an explicit window wins over the max-gap preference
         span = int((hi - lo).total_seconds())
         return lo + timedelta(seconds=rng.randint(0, span)) if span > 0 else lo
     span = int((r.end - r.start).total_seconds())
     return r.start + timedelta(seconds=rng.randint(0, max(span, 0)))
 
 
-# --- derived expressions (restricted AST) ---------------------------------------------------------
-_BINOPS: dict[type[ast.operator], Callable[[Any, Any], Any]] = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.FloorDiv: operator.floordiv,
-    ast.Mod: operator.mod,
-}
-
-
-class _NullResult(Exception):
-    pass
-
-
-def _expression_names(expression: str) -> list[str]:
-    try:
-        tree = ast.parse(expression, mode="eval")
-    except SyntaxError as e:
-        raise ExpansionError(f"invalid derived expression {expression!r}: {e.msg}") from e
-    funcs = {"min", "max", "abs", "round", "randint"}
-    return [n.id for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id not in funcs]
-
-
+# --- derived expressions (shared restricted language, generation/expressions.py) ------------------
 def _derived_values(
-    ctx: _Context, table: Table, col: Column, expression: str, n: int, generated: dict[str, list[Value]]
+    ctx: _Context,
+    schema: Schema,
+    table: Table,
+    col: Column,
+    expression: str,
+    n: int,
+    generated: dict[str, list[Value]],
 ) -> list[Value]:
-    tree = ast.parse(expression, mode="eval")
-    funcs: dict[str, Callable[..., Any]] = {
-        "min": min,
-        "max": max,
-        "abs": abs,
-        "round": round,
-        "randint": lambda a, b: ctx.rng.randint(int(a), int(b)) if b >= a else int(a),
-    }
-
-    def ev(node: ast.AST, i: int) -> Any:
-        if isinstance(node, ast.Expression):
-            return ev(node.body, i)
-        if (
-            isinstance(node, ast.Constant)
-            and isinstance(node.value, int | float)
-            and not isinstance(node.value, bool)
-        ):
-            return node.value
-        if isinstance(node, ast.Name):
-            if node.id in funcs:
-                raise ExpansionError(f"{col.name}: {node.id} must be called")
-            value = generated[table.column(node.id).name][i]
-            if value is None:
-                raise _NullResult
-            return float(value) if isinstance(value, Decimal) else value
-        if isinstance(node, ast.BinOp) and type(node.op) in _BINOPS:
-            return _BINOPS[type(node.op)](ev(node.left, i), ev(node.right, i))
-        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
-            return -ev(node.operand, i)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in funcs:
-            return funcs[node.func.id](*(ev(a, i) for a in node.args))
-        raise ExpansionError(
-            f"{table.name}.{col.name}: unsupported construct in derived expression {expression!r}"
-        )
-
+    try:
+        compiled: Compiled = compile_expression(expression)
+    except ValueError as e:
+        raise ExpansionError(f"{table.name}.{col.name}: {e}") from e
+    names = [c.name for c in table.columns if c.name in generated]
     out: list[Value] = []
     for i in range(n):
+        row = {name: generated[name][i] for name in names}
+
+        def parent(fk_col: str, pcol: str, _i: int = i) -> Value:
+            return _parent_value(ctx, schema, table, generated, fk_col, pcol, _i)
+
         try:
-            out.append(ev(tree, i))
-        except _NullResult:
+            out.append(compiled.evaluate(row, parent, ctx.rng))
+        except NullResult:
             out.append(None)
-        except ZeroDivisionError:
-            out.append(None)
+        except ValueError as e:
+            raise ExpansionError(f"{table.name}.{col.name}: {e}") from e
     return out
 
 
@@ -474,6 +489,8 @@ def _derived_values(
 def _apply_nulls(ctx: _Context, col: Column, cplan: ColumnPlan, values: list[Value]) -> list[Value]:
     if not col.nullable or col.primary_key or cplan.null_ratio <= 0:
         return values
+    if isinstance(cplan.recipe, DerivedRecipe | AggregateRecipe):
+        return values  # NULLs of derived/aggregate columns come only from the expression (NullResult)
     return [None if ctx.rng.random() < cplan.null_ratio else v for v in values]
 
 
@@ -506,6 +523,8 @@ def _conform(col: Column, value: Value) -> Value:
             bool(value) if not isinstance(value, str) else value.strip().lower() in {"true", "t", "1", "yes"}
         )
     if t is ColumnType.DATE:
+        if isinstance(value, pd.Timestamp):
+            return value.to_pydatetime().date()
         return (
             value.date()
             if isinstance(value, datetime)
@@ -613,3 +632,49 @@ def _fill_deferred(ctx: _Context, schema: Schema, table: Table, column: str, pla
     if not parents and not col.nullable:
         raise ExpansionError(f"{table.name}.{column} is NOT NULL but parent {parent.name} has no rows")
     frame[col.name] = pd.Series(values, dtype=object)
+
+
+# --- post-pass: aggregate columns from children ------------------------------------------------------------
+def _fill_aggregates(ctx: _Context, schema: Schema, plan: GenerationPlan) -> None:
+    for tplan in plan.tables:
+        if not schema.has_table(tplan.table):
+            continue
+        table = schema.table(tplan.table)
+        for cplan in tplan.columns:
+            r = cplan.recipe
+            if not isinstance(r, AggregateRecipe) or not table.has_column(cplan.column):
+                continue
+            col = table.column(cplan.column)
+            child = schema.table(r.child_table)
+            fk = child.fk_for_column(r.child_fk_column)
+            if fk is None:
+                raise ExpansionError(f"{table.name}.{col.name}: {child.name}.{r.child_fk_column} is not a FK")
+            ref_col = table.column(
+                fk.ref_columns[fk.columns.index(child.column(r.child_fk_column).name)]
+            ).name
+            child_frame = ctx.tables[child.name]
+            keys = child_frame[child.column(r.child_fk_column).name].tolist()
+            values = (
+                child_frame[child.column(r.child_column).name].tolist() if r.child_column else [1] * len(keys)
+            )
+            groups: dict[Value, list[float]] = {}
+            for key, value in zip(keys, values, strict=True):
+                if key is None or (value is None and r.agg != "count"):
+                    continue
+                groups.setdefault(key, []).append(1.0 if r.agg == "count" else float(value))
+            frame = ctx.tables[table.name]
+            result: list[Value] = []
+            for key in frame[ref_col].tolist():
+                items = groups.get(key)
+                if not items:
+                    result.append(_conform(col, r.default))
+                    continue
+                agg = {
+                    "sum": sum(items),
+                    "count": float(len(items)),
+                    "min": min(items),
+                    "max": max(items),
+                    "avg": sum(items) / len(items),
+                }
+                result.append(_conform(col, agg[r.agg]))
+            frame[col.name] = pd.Series(result, dtype=object)

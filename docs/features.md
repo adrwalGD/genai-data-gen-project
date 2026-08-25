@@ -118,10 +118,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F2.7 — Cross-column and cross-table consistency rules
 - milestone: M2
-- state: active
+- state: passing
 - behavior: derived expressions and `after_column` may reference parent-row columns through a FK (`parent(menu_id).price`, `parent(customer_id).registration_date`); a new `aggregate` recipe fills parent columns from children after generation (`total_amount = sum(Order_Items.subtotal)`); derived expressions support conditionals/string constants for status columns (`'Returned' if return_date is not None else 'Checked Out'`); heuristics use these for the sample schemas so that Order_Items.subtotal = quantity × Menu.price, Orders.total_amount = Σ subtotals (0 for orders without items), order/review/loan dates ≥ the customer's/member's registration/join date, Book_Loans.loan_status agrees with return_date/due_date, and termination/return dates never fall after the anchor date; validator gains consistency checks for these relations when the plan declares them.
 - verification: `make test K=consistency && make e2e`
-- evidence: —
+- evidence: make test K=consistency → expression language (parent lookups, conditionals, None semantics, functions, rejected constructs), restaurants: subtotal = quantity × Menu.price and total_amount = Σ subtotals for all rows, order/review dates ≥ registration, terminations ≤ anchor and ≥ join + 30d or NULL; library: loan_status ⇄ return_date/due_date with no injected NULLs; checker flags broken relations; validate_plan rejects bad aggregate/parent refs; engine report includes consistency; make e2e → all 3 schemas × 1000 rows passed with consistency checks; make check green (2026-08-25)
 
 ## M3 — LLM-powered generation
 
@@ -157,7 +157,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F4.1 — EditPlan model and deterministic applier
 - milestone: M4
-- state: not_started
+- state: active
 - behavior: `generation.feedback.EditPlan` supports `set_values`, `regenerate_column`, `add_rows`, `delete_rows`, `update_pool`; `apply(plan, dataset, schema)` keeps PK uniqueness, FK integrity (cascade or re-sample), revalidates and returns the new dataset + report; deleting parent rows cascades or fails with a clear error per plan option.
 - verification: `make test K=feedback`
 - evidence: —

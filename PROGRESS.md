@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M3 LLM-powered generation — features F3.1–F3.4 passing** (gate pending); F2.7 active (M2 follow-up). Gates M0, M1, M2: PASS.
+- Milestone: **M4 Feedback edits** — F4.1 active. M3 features passing (gate verification running); F2.7 consistency rules passing. Gates M0, M1, M2: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F2.7 (cross-column/cross-table consistency rules)
+- Active feature: F4.1 (EditPlan model and deterministic applier)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -34,6 +34,8 @@ summary plus anything that does not fit a feature entry.
       F2.5 Postgres loader (1000 rows/table × 3 schemas with FKs) · F2.6 `make e2e` offline smoke green.
 - [x] M3 F3.1 Gemini client wrapper · F3.2 LLM planner overrides · F3.3 LLM text pools · F3.4 engine + `make e2e-llm`
       (restaurants 200 rows/table with Gemini, Langfuse trace `data_generation`).
+- [x] F2.7 consistency rules: expression language with parent lookups + conditionals, aggregate recipes, heuristics for
+      subtotal/total/status/registration-date relations, consistency checker in the engine report.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -41,9 +43,7 @@ summary plus anything that does not fit a feature entry.
 - (none)
 
 ## Blocked / Known Issues
-- Realism gaps found by the M2 verifier (offline heuristics): loan_status independent of return_date, order/review dates
-  before registration, subtotal ≠ quantity × price, totals ≠ Σ subtotals, some end/termination dates after the anchor,
-  Faker catch_phrase names → F2.7 (code) + LLM pools (M3).
+- Remaining realism gap (offline mode only): Faker catch_phrase/bs names for pools; the LLM pools cover it when Gemini is on.
 - Lesson (2026-08-25, #2): commit `fd9bc71` claimed all M1-verifier fixes but an edit script had aborted midway and the
   chain kept going (exit code unchecked); completed honestly in the follow-up commit. Rule added to docs/loop.md.
 - Lesson (2026-08-25): a piped `make check | tail` hid a mypy failure and F1.1 was marked passing on a red gate;
@@ -61,8 +61,8 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. F2.7 consistency rules (parent lookups, aggregates, conditional derived, heuristics) → `make e2e` clean.
-2. M3 gate → independent verifier; then M4 feedback (F4.1 EditPlan applier, F4.2 NL → EditPlan).
+1. M4 feedback: F4.1 EditPlan applier → F4.2 NL → EditPlan with Gemini.
+2. Record the M3 gate verdict when the verifier reports; apply findings.
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)

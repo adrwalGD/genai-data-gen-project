@@ -7,14 +7,16 @@ accepts for any parsable schema, so the whole pipeline works without network acc
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import sqlglot
 from sqlglot import exp
 from sqlglot.errors import ParseError
 
 from ..schema.models import Column, ColumnType, Schema, Table
+from .expressions import ANCHOR_DATE
 from .recipes import (
+    AggregateRecipe,
     BooleanRecipe,
     ColumnPlan,
     ColumnRecipe,
@@ -34,7 +36,7 @@ from .recipes import (
     TextPoolRecipe,
 )
 
-TODAY = date(2026, 8, 25)  # fixed anchor keeps plans deterministic across runs/tests
+TODAY = ANCHOR_DATE  # fixed anchor keeps plans deterministic across runs/tests
 RECENT_START = date(2023, 1, 1)
 HISTORY_START = date(2015, 1, 1)
 
@@ -139,8 +141,8 @@ def plan_column(schema: Schema, table: Table, col: Column) -> ColumnPlan:
 
 
 def null_ratio_for(table: Table, col: Column, recipe: ColumnRecipe) -> float:
-    if not col.nullable or col.primary_key:
-        return 0.0
+    if not col.nullable or col.primary_key or isinstance(recipe, DerivedRecipe | AggregateRecipe):
+        return 0.0  # derived/aggregate values are functions of other columns; NULL only via the expression
     name = col.name.lower()
     if re.search(r"(death|termination|return|end)_?(date|at)?$", name) or name.startswith("end_"):
         return 0.85 if "death" in name else 0.35
@@ -163,6 +165,9 @@ def recipe_for(schema: Schema, table: Table, col: Column) -> ColumnRecipe:
     if col.primary_key and col.type.is_integer and len(table.primary_key) == 1:
         return SequenceRecipe(start=1)
     if col.type is ColumnType.ENUM:
+        status = _status_expression(table, col)
+        if status:
+            return DerivedRecipe(expression=status)
         return EnumWeightedRecipe(values=list(col.enum_values), weights=_enum_weights(col.enum_values))
     if col.type is ColumnType.BOOLEAN:
         return BooleanRecipe(true_ratio=0.8 if re.search(r"(active|available|enabled|is_)", name) else 0.5)
@@ -172,8 +177,11 @@ def recipe_for(schema: Schema, table: Table, col: Column) -> ColumnRecipe:
     if in_values and col.type.is_textual:
         return EnumWeightedRecipe(values=in_values)
     if col.type.is_temporal:
-        return _temporal_recipe(table, col)
+        return _temporal_recipe(schema, table, col)
     if col.type.is_numeric:
+        consistent = _consistency_recipe(schema, table, col)
+        if consistent is not None:
+            return consistent
         return _numeric_recipe(table, col, lo, hi)
     return _text_recipe(schema, table, col)
 
@@ -185,11 +193,74 @@ def _enum_weights(values: list[str]) -> list[float] | None:
     return [3.0] + [1.5] * (len(values) - 2) + [0.5]
 
 
-def _temporal_recipe(table: Table, col: Column) -> ColumnRecipe:
+def _status_expression(table: Table, col: Column) -> str | None:
+    """ENUM status columns follow the row's dates: Returned ⇄ return_date, Overdue ⇄ due_date < TODAY."""
+    if (
+        "status" not in col.name.lower()
+        or "Returned" not in col.enum_values
+        or not table.has_column("return_date")
+    ):
+        return None
+    default = next(
+        (v for v in col.enum_values if v not in {"Returned", "Overdue", "Lost"}), col.enum_values[0]
+    )
+    overdue = "'Overdue'" if "Overdue" in col.enum_values and table.has_column("due_date") else f"'{default}'"
+    due_branch = f"({overdue} if due_date is not None and due_date < TODAY else '{default}')"
+    return f"'Returned' if return_date is not None else {due_branch}"
+
+
+def _consistency_recipe(schema: Schema, table: Table, col: Column) -> ColumnRecipe | None:
+    """subtotal = quantity * parent price; total_amount = sum of children subtotals."""
+    name = col.name.lower()
+    if re.search(r"(subtotal|line_total|line_amount)", name):
+        qty = next((c.name for c in table.columns if re.search(r"^(quantity|qty)$", c.name.lower())), None)
+        for fk in table.foreign_keys:
+            if len(fk.columns) != 1 or not schema.has_table(fk.ref_table):
+                continue
+            parent = schema.table(fk.ref_table)
+            price = next(
+                (c.name for c in parent.columns if re.search(r"(unit_price|^price$)", c.name.lower())), None
+            )
+            if qty and price:
+                return DerivedRecipe(expression=f"{qty} * parent({fk.columns[0]}).{price}")
+    if re.search(r"(total_amount|grand_total|order_total|^total$)", name):
+        for child, fk in schema.references_of(table.name):
+            if len(fk.columns) != 1:
+                continue
+            pattern = r"(subtotal|line_total|line_amount)"
+            amount = next((c.name for c in child.columns if re.search(pattern, c.name.lower())), None)
+            if amount:
+                return AggregateRecipe(
+                    child_table=child.name, child_fk_column=fk.columns[0], child_column=amount
+                )
+    return None
+
+
+def _registration_ref(schema: Schema, table: Table) -> str | None:
+    """`parent(fk).<registration-like date>` when the row belongs to a customer/member/employee."""
+    for fk in table.foreign_keys:
+        if len(fk.columns) != 1 or not schema.has_table(fk.ref_table):
+            continue
+        parent = schema.table(fk.ref_table)
+        if parent.name == table.name:
+            continue
+        for c in parent.columns:
+            if c.type.is_temporal and re.search(
+                r"(registration|join|signup|hire|enrollment|created)", c.name.lower()
+            ):
+                return f"parent({fk.columns[0]}).{c.name}"
+    return None
+
+
+def _temporal_recipe(schema: Schema, table: Table, col: Column) -> ColumnRecipe:
     name = col.name.lower()
     is_dt = col.type is ColumnType.DATETIME
     birth = _find(table, r"(birth|dob|born)")
     start_like = _find(table, r"^(start|loan|hire|join|order|enrollment|registration|issue|created)")
+    if re.search(r"^(order|loan|review|transaction|payment|rental|booking|visit|purchase)", name):
+        after = _registration_ref(schema, table)
+        if after:
+            return _after(is_dt, after, 0, 720, RECENT_START)
     if re.search(r"(birth|dob|born)", name):
         return DateWindowRecipe(start=date(1945, 1, 1), end=date(2006, 12, 31))
     if "death" in name:
@@ -201,7 +272,7 @@ def _temporal_recipe(table: Table, col: Column) -> ColumnRecipe:
             max_days_after=365 * 95,
         )
     if name.startswith("due"):
-        return _after(is_dt, start_like, 14, 28, RECENT_START)
+        return _after(is_dt, start_like, 14, 28, RECENT_START, end=TODAY + timedelta(days=60))
     if name.startswith("return") or name.startswith("termination") or name.startswith("end"):
         return _after(
             is_dt,
@@ -234,17 +305,20 @@ def _window(is_dt: bool, start: date, end: date) -> ColumnRecipe:
     return DateWindowRecipe(start=start, end=end)
 
 
-def _after(is_dt: bool, after: str | None, min_days: int, max_days: int, start: date) -> ColumnRecipe:
+def _after(
+    is_dt: bool, after: str | None, min_days: int, max_days: int, start: date, end: date | None = None
+) -> ColumnRecipe:
+    end = end or TODAY
     if is_dt:
         return DateTimeWindowRecipe(
             start=datetime.combine(start, datetime.min.time()),
-            end=datetime.combine(TODAY, datetime.min.time()),
+            end=datetime.combine(end, datetime.min.time()),
             after_column=after,
             min_hours_after=min_days * 24,
             max_hours_after=max_days * 24,
         )
     return DateWindowRecipe(
-        start=start, end=TODAY, after_column=after, min_days_after=min_days, max_days_after=max_days
+        start=start, end=end, after_column=after, min_days_after=min_days, max_days_after=max_days
     )
 
 

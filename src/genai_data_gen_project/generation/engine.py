@@ -21,6 +21,7 @@ from ..schema.models import Schema
 from ..schema.parser import parse_ddl
 from ..storage.dataset import Dataset, default_dataset_name, new_dataset_id
 from . import heuristics, planner, pools
+from .consistency import check_consistency
 from .expander import expand
 from .recipes import GenerationPlan
 from .validator import ValidationReport, validate
@@ -102,6 +103,8 @@ def generate(
 
         report_progress("Validating")
         report = validate(schema, tables, expected_rows={t.table: t.rows for t in plan.tables})
+        report.issues.extend(check_consistency(schema, plan, tables))
+        report.ok = not report.issues
         lap("validate")
 
         dataset = Dataset(

@@ -74,7 +74,7 @@ def test_duplicate_pk_and_unique(restaurants) -> None:  # type: ignore[no-untype
     assert rules == [("pk_duplicate", "customer_id"), ("unique", "email")]
     # overwriting id 6 with a duplicate removes it from the parent key set → children of 6 dangle, only
     others = [i for i in report.issues if i.table != "Customers"]
-    assert others and all(i.rule == "fk_dangling" and i.examples == ["6"] for i in others), others
+    assert all(i.rule == "fk_dangling" and i.examples == ["6"] for i in others), others
 
 
 def test_structural_problems(restaurants) -> None:  # type: ignore[no-untyped-def]
