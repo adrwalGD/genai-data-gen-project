@@ -20,12 +20,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from genai_data_gen_project.config import Settings  # noqa: E402
-from genai_data_gen_project.generation import heuristics  # noqa: E402
-from genai_data_gen_project.generation.expander import ExpansionError, expand  # noqa: E402
-from genai_data_gen_project.generation.validator import validate  # noqa: E402
-from genai_data_gen_project.schema.parser import DDLParseError, parse_ddl  # noqa: E402
+from genai_data_gen_project.generation import engine  # noqa: E402
+from genai_data_gen_project.generation.expander import ExpansionError  # noqa: E402
+from genai_data_gen_project.llm.client import GeminiClient, LLMError  # noqa: E402
+from genai_data_gen_project.schema.order import UnsatisfiableSchemaError  # noqa: E402
+from genai_data_gen_project.schema.parser import DDLParseError  # noqa: E402
 from genai_data_gen_project.storage import csvio, datasets, postgres  # noqa: E402
-from genai_data_gen_project.storage.dataset import Dataset, new_dataset_id  # noqa: E402
+from genai_data_gen_project.storage.dataset import Dataset  # noqa: E402
 
 SAMPLES = {
     "library": ROOT / "project-spec" / "library_mgm_schema.ddl",
@@ -40,8 +41,11 @@ class StageFailed(Exception):
         self.stage = stage
 
 
-def run_one(name: str, ddl_path: Path, rows: int, seed: int, keep: bool, settings: Settings) -> bool:
-    print(f"\n=== {name}: {ddl_path.name} — {rows} rows/table, seed {seed} ===")
+def run_one(
+    name: str, ddl_path: Path, rows: int, seed: int, keep: bool, settings: Settings, llm: GeminiClient | None
+) -> bool:
+    mode = f"Gemini {llm.model}" if llm else "offline"
+    print(f"\n=== {name}: {ddl_path.name} — {rows} rows/table, seed {seed}, {mode} ===")
     started = time.perf_counter()
     timings: dict[str, float] = {}
     root: Path | None = None
@@ -54,34 +58,33 @@ def run_one(name: str, ddl_path: Path, rows: int, seed: int, keep: bool, setting
 
     try:
         try:
-            schema = parse_ddl(ddl_path.read_text(encoding="utf-8"))
-        except (DDLParseError, OSError) as e:
-            raise StageFailed("parse", f"{e} — fix the DDL file {ddl_path}") from e
-        stage("parse")
-        for note in schema.notes:
-            print(f"  note: {note}")
-        plan = heuristics.plan(schema, rows)
-        stage("plan")
+            ddl = ddl_path.read_text(encoding="utf-8")
+        except OSError as e:
+            raise StageFailed("read", f"{e} — check the DDL path {ddl_path}") from e
+        request = engine.GenerationRequest(
+            ddl=ddl, rows_per_table=rows, seed=seed, name=f"smoke-{name}", temperature=0.7,
+            extra_params={"source": "scripts/e2e_smoke.py"},
+        )  # fmt: skip
         try:
-            tables = expand(schema, plan, seed=seed)
-        except ExpansionError as e:
-            raise StageFailed("expand", f"{e} — adjust the plan/recipes (generation/heuristics.py)") from e
-        stage("expand")
-        report = validate(schema, tables, expected_rows=dict.fromkeys(schema.table_names, rows))
-        stage("validate")
-        if not report.ok:
-            lines = "\n".join(f"    {issue}" for issue in report.issues[:20])
+            dataset = engine.generate(request, llm, settings, progress=lambda msg: print(f"  … {msg}"))
+        except DDLParseError as e:
+            raise StageFailed("parse", f"{e} — fix the DDL file {ddl_path}") from e
+        except (ExpansionError, UnsatisfiableSchemaError) as e:
+            raise StageFailed("expand", f"{e} — adjust the schema/plan (generation/heuristics.py)") from e
+        except LLMError as e:
+            raise StageFailed("llm", f"{e}") from e
+        stage("generate")
+        timings.update({f"engine.{k}": v for k, v in dataset.params.get("timings_s", {}).items()})
+        for note in dataset.params.get("notes", []):
+            print(f"  note: {note}")
+        report = engine.report_of(dataset)
+        if report is None or not report.ok:
+            issues = report.issues[:20] if report else []
+            lines = "\n".join(f"    {issue}" for issue in issues)
             raise StageFailed("validate", f"generated data violates the schema:\n{lines}")
-        dataset = Dataset(
-            id=new_dataset_id(),
-            name=f"smoke-{name}",
-            ddl=ddl_path.read_text(encoding="utf-8"),
-            schema=schema,
-            tables=tables,
-            plan=plan.model_dump(mode="json"),
-            report=report.model_dump(mode="json"),
-            params={"rows_per_table": rows, "seed": seed, "llm": False, "source": "scripts/e2e_smoke.py"},
-        )
+        if dataset.params.get("trace_id"):
+            print(f"  langfuse trace: {dataset.params['trace_id']}")
+        schema = dataset.schema
         root = settings.datasets_dir if keep else Path(tempfile.mkdtemp(prefix="smoke-datasets-"))
         try:
             datasets.save(dataset, root)
@@ -141,9 +144,6 @@ def main() -> int:
     parser.add_argument("--keep", action="store_true", help="keep the dataset on disk and in PostgreSQL")
     parser.add_argument("--llm", action="store_true", help="use Gemini for planning and text pools (F3.4)")
     args = parser.parse_args()
-    if args.llm:
-        print("LLM mode is not wired yet — it arrives with F3.4 (generation.engine). Run without --llm.")
-        return 2
     if args.schema == "all":
         targets = list(SAMPLES.items())
     elif args.schema in SAMPLES:
@@ -157,7 +157,8 @@ def main() -> int:
             return 2
         targets = [(path.stem, path)]
     settings = Settings()
-    outcomes = [run_one(name, path, args.rows, args.seed, args.keep, settings) for name, path in targets]
+    llm = GeminiClient(settings) if args.llm else None
+    outcomes = [run_one(name, path, args.rows, args.seed, args.keep, settings, llm) for name, path in targets]
     print()
     if all(outcomes):
         print(f"e2e smoke: all {len(outcomes)} schema(s) passed")

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from typing import Any
 
 from .config import Settings, get_settings
@@ -79,3 +81,26 @@ def current_trace_id() -> str | None:
     from langfuse import get_client
 
     return get_client().get_current_trace_id()
+
+
+@contextmanager
+def traced(
+    name: str, *, session_id: str | None = None, tags: list[str] | None = None, **metadata: Any
+) -> Iterator[None]:
+    """Open a Langfuse span named `name` with session/tags/metadata; a no-op when tracing is disabled."""
+    if not _state["enabled"]:
+        with nullcontext():
+            yield
+        return
+    from langfuse import get_client, propagate_attributes
+
+    client = get_client()
+    attrs: dict[str, Any] = {"tags": tags or []}
+    if session_id:
+        attrs["session_id"] = session_id
+    clean = {k: str(v)[:500] for k, v in metadata.items() if v is not None}
+    with (
+        client.start_as_current_observation(as_type="span", name=name),
+        propagate_attributes(**attrs, metadata=clean),
+    ):
+        yield

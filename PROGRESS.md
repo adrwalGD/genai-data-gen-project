@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M3 LLM-powered generation** — F3.1 passing, F3.2 active. M2 features passing (gate verification running). Gates M0, M1: PASS.
-- Latest commit: `475a7fd` (feat(generation): F3.2 LLM planner)
+- Milestone: **M3 LLM-powered generation — features F3.1–F3.4 passing** (gate pending); F2.7 active (M2 follow-up). Gates M0, M1, M2: PASS.
+- Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F3.3 (LLM text pools, parallel batches, dedupe)
+- Active feature: F2.7 (cross-column/cross-table consistency rules)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -27,8 +27,13 @@ summary plus anything that does not fit a feature entry.
       discrepancies applied (TokenError caught, compose project name, fallback/unknown-type notes, docs corrected).
 - [x] M1 F1.1 DDL parser → IR (16 tests) · F1.2 generation order + cycle breaking (6) · F1.3 Postgres DDL emitter
       (19 unit + 4 integration: 3 sample schemas created in PostgreSQL 17, constraints enforced) · F1.4 prompt summary (4).
+- [x] **Gate M2: PASS** 2026-08-25 at `9b01563` — independent verifier: gate 51 s, 1000 rows/table × 3 schemas clean, DB
+      enforces FKs/ENUMs, failure paths exit 1 with fix hints; findings applied (K-filter quoting, exit-check drift, smoke
+      traceback, email suffix) and F2.7 consistency rules queued.
 - [x] M2 F2.1 recipes + heuristic planner · F2.2 expander · F2.3 validator · F2.4 CSV/ZIP + dataset registry ·
       F2.5 Postgres loader (1000 rows/table × 3 schemas with FKs) · F2.6 `make e2e` offline smoke green.
+- [x] M3 F3.1 Gemini client wrapper · F3.2 LLM planner overrides · F3.3 LLM text pools · F3.4 engine + `make e2e-llm`
+      (restaurants 200 rows/table with Gemini, Langfuse trace `data_generation`).
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -36,6 +41,9 @@ summary plus anything that does not fit a feature entry.
 - (none)
 
 ## Blocked / Known Issues
+- Realism gaps found by the M2 verifier (offline heuristics): loan_status independent of return_date, order/review dates
+  before registration, subtotal ≠ quantity × price, totals ≠ Σ subtotals, some end/termination dates after the anchor,
+  Faker catch_phrase names → F2.7 (code) + LLM pools (M3).
 - Lesson (2026-08-25, #2): commit `fd9bc71` claimed all M1-verifier fixes but an edit script had aborted midway and the
   chain kept going (exit code unchecked); completed honestly in the follow-up commit. Rule added to docs/loop.md.
 - Lesson (2026-08-25): a piped `make check | tail` hid a mypy failure and F1.1 was marked passing on a red gate;
@@ -53,10 +61,9 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. M2 gate → independent verifier on the M2 commit; record `Gate M2`.
-2. M3: F3.1 `llm/client.py` (structured/stream/tools, retries, thinking budget, Langfuse) → F3.2 planner → F3.3 pools →
-   F3.4 engine + `make e2e-llm`.
-3. M4 feedback; M5/M6 UI; M7 hardening (docs/PLAN.md).
+1. F2.7 consistency rules (parent lookups, aggregates, conditional derived, heuristics) → `make e2e` clean.
+2. M3 gate → independent verifier; then M4 feedback (F4.1 EditPlan applier, F4.2 NL → EditPlan).
+3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)
 - **2026-08-25 (session 1, cont.)** — M0 committed (`38572e8`); independent M0 gate verifier launched; F1.1 DDL

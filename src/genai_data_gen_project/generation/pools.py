@@ -137,6 +137,7 @@ def fill_pools(
         for req, values, error in pool.map(work, requests):
             if error:
                 result.notes.append(f"{req.table}.{req.column}: pool fell back to Faker — {error}")
+            result.llm_values += min(len(values), req.size)  # counted before any Faker top-up
             if len(values) < req.size:
                 shortfall = req.size - len(values)
                 if values:
@@ -145,7 +146,6 @@ def fill_pools(
                     )
                 values = _extend_unique(values, _faker_values(faker, req, shortfall * 2), req.size)
                 result.fallback_values += shortfall
-            result.llm_values += req.size - max(0, req.size - len(values))
             result.pools[req.key] = values[: req.size] if req.unique else values
             if progress:
                 progress(f"{req.table}.{req.column}: {len(result.pools[req.key])} values")
