@@ -19,6 +19,7 @@ SS_TEMPERATURE = "temperature"
 SS_SEED = "seed"
 SS_LLM_ENABLED = "llm_enabled"  # use Gemini (False = offline heuristics + Faker)
 SS_LLM_BACKEND = "llm_backend"  # injected LLMBackend (tests); None = build the real client
+SS_SQL_EXECUTOR = "sql_executor"  # injected read-only SQL executor (tests); None = PostgreSQL
 SS_DATASET = "dataset"  # storage.dataset.Dataset of the last generation
 SS_SELECTED_TABLE = "selected_table"
 SS_GENERATION_LOG = "generation_log"  # progress lines of the last run
@@ -36,6 +37,7 @@ DEFAULTS: dict[str, Any | Callable[[], Any]] = {
     SS_SEED: 42,
     SS_LLM_ENABLED: True,
     SS_LLM_BACKEND: None,
+    SS_SQL_EXECUTOR: None,
     SS_DATASET: None,
     SS_SELECTED_TABLE: None,
     SS_GENERATION_LOG: list,

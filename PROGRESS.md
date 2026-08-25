@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M6 Talk to your data** — F6.1–F6.3 passing, F6.4 active. Gates M0–M5: PASS.
+- Milestone: **M6 Talk to your data** — F6.1–F6.4 passing, F6.5 active. Gates M0–M5: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F6.4 (Talk-to-data page)
+- Active feature: F6.5 (per-turn Langfuse traces)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -56,6 +56,8 @@ summary plus anything that does not fit a feature entry.
 - [x] **Gate M4: PASS** and **Gate M5: PASS** (2026-08-25 at `f2fd579`): live cross-table feedback applied twice cleanly,
       hand-built typo → EditError with parent columns; all AppTests green; container healthy with DDLs/ADC/DB reachable.
 - [x] M6 F6.3 chart specs → plotly figures (bar/line/pie/scatter/histogram) with actionable ChartSpecError.
+- [x] M6 F6.4 Talk-to-data page: dataset selector with PostgreSQL status/reload, chat history replay, live agent
+      events (SQL expanders, result tables, plotly charts, streamed answers), clear chat, offline hint.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -96,7 +98,7 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. M6 Talk to your data: F6.4 page → F6.5 traces → M6 gate.
+1. M6 Talk to your data: F6.5 per-turn Langfuse traces → M6 gate verifier.
 2. M7 hardening: README/demo script, error UX (incl. verifier nits), `make check-all`, demo dataset, v1.0 tag.
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import Settings, get_settings
+from ..schema.models import Schema
 from ..schema.parser import parse_ddl
 from . import csvio
 from .dataset import DATASET_ID_RE, Dataset
@@ -159,6 +160,14 @@ def load(dataset_id: str, root: Path | None = None) -> Dataset:
         params=dict(m.get("params") or {}),
         created_at=datetime.fromisoformat(m["created_at"]),
     )
+
+
+def load_schema(dataset_id: str, root: Path | None = None) -> tuple[Schema, str]:
+    """Parse the saved DDL only (no CSVs) — enough for talk-to-data prompts and SQL."""
+    path = _dir(root or datasets_root(), dataset_id)
+    m = _read_manifest(path)
+    ddl = (path / DDL_FILE).read_text(encoding="utf-8")
+    return parse_ddl(ddl, dialect=m.get("source_dialect")), ddl
 
 
 def delete(dataset_id: str, root: Path | None = None) -> None:

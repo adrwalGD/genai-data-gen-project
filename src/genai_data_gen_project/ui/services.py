@@ -12,6 +12,8 @@ from pathlib import Path
 
 import streamlit as st
 
+from genai_data_gen_project.chat import tools
+from genai_data_gen_project.chat.agent import Agent
 from genai_data_gen_project.config import Settings, get_settings
 from genai_data_gen_project.generation import engine, feedback
 from genai_data_gen_project.generation.expander import ExpansionError
@@ -144,3 +146,41 @@ def save_dataset(dataset: Dataset, *, name: str | None = None, cfg: Settings | N
     except postgres.LoadError as e:
         return SaveOutcome(dataset.id, path, False, dataset.row_counts(), warning=str(e))
     return SaveOutcome(dataset.id, path, True, result.row_counts)
+
+
+def saved_datasets() -> list[datasets.DatasetInfo]:
+    return datasets.list_datasets(get_settings().datasets_dir)
+
+
+def dataset_loaded(dataset_id: str) -> bool | None:
+    """True/False when PostgreSQL answers, None when it is unreachable."""
+    if st.session_state.get(state.SS_SQL_EXECUTOR) is not None:
+        return True
+    try:
+        return postgres.is_loaded(dataset_id, get_settings())
+    except postgres.LoadError:
+        return None
+
+
+def load_saved_into_db(dataset_id: str) -> postgres.LoadResult:
+    """(Re)load a saved dataset from its CSV files into PostgreSQL."""
+    cfg = get_settings()
+    dataset = datasets.load(dataset_id, cfg.datasets_dir)
+    try:
+        return postgres.load_dataset(dataset, cfg)
+    except postgres.LoadError as e:
+        raise UIError(str(e)) from e
+
+
+def agent_for(dataset_id: str) -> Agent:
+    """Talk-to-data agent for a saved dataset (Gemini or injected fake; PostgreSQL or injected executor)."""
+    llm = llm_backend()
+    if llm is None:
+        raise UIError("Talk to your data needs Gemini — switch on 'Use Gemini' on the Data Generation page.")
+    cfg = get_settings()
+    try:
+        schema, _ddl = datasets.load_schema(dataset_id, cfg.datasets_dir)
+    except datasets.DatasetNotFound as e:
+        raise UIError(f"Dataset {dataset_id!r} is not in the registry anymore — save a dataset first.") from e
+    executor = st.session_state.get(state.SS_SQL_EXECUTOR) or tools.make_executor(dataset_id, cfg)
+    return Agent(schema, llm, executor, settings=cfg)

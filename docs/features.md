@@ -231,14 +231,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F6.4 — Talk-to-data page
 - milestone: M6
-- state: active
+- state: passing
 - behavior: page has a dataset selector (saved datasets), chat history (`st.chat_message`), `st.chat_input`, streamed answers (`st.write_stream`), result tables, plotly charts, a "Show SQL" expander per turn, and a clear-conversation button; with a fake agent the AppTest drives one question to a table + chart.
 - verification: `make test-ui K=talk_page`
-- evidence: —
+- evidence: make test-ui K=talk_page → 2 passed (AppTest with injected scripted LLM + SQL executor: saved dataset listed and selectable; 'How many restaurants are there?' → SQL expander + result table + streamed answer stored in history; 'Plot revenue by city' → run_sql table + bar chart spec rendered; history replay keeps earlier tables; Clear chat empties the conversation; offline mode explains that Gemini is needed); make check green (2026-08-25)
 
 ### F6.5 — Per-turn Langfuse traces
 - milestone: M6
-- state: not_started
+- state: active
 - behavior: each question produces a Langfuse trace `talk_to_data_turn` with `session_id` = Streamlit session id, tags `[talk-to-data]`, nested GENERATION spans for every Gemini call and a span per tool execution; the trace id is shown in a small caption in the UI.
 - verification: `make test-llm K=trace`
 - evidence: —
