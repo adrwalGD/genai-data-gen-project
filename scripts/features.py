@@ -101,8 +101,13 @@ def validate(feats: list[Feature]) -> list[str]:
             )
         if f.state == "blocked" and f.evidence in EMPTY_EVIDENCE:
             errors.append(f"{f.id}: blocked without a reason in evidence")
-        if not f.fields.get("verification"):
+        verification = f.fields.get("verification", "")
+        if not verification:
             errors.append(f"{f.id}: empty verification command")
+        elif re.search(r"K=\w+ (or|and) ", verification):
+            errors.append(
+                f"{f.id}: quote multi-word K filters, e.g. K='a or b' (make treats bare words as targets)"
+            )
     if not feats:
         errors.append("no features found — expected '### F<n>.<m> — title' sections")
     return errors

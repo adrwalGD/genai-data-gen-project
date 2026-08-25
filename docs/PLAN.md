@@ -43,6 +43,8 @@ progress, can pick next step" (lecture 6).
 - `export.py`: CSV per table (UTF-8, ISO dates) + ZIP; `storage/datasets.py`: `data/datasets/<id>/{manifest.json,
   schema.ddl, tables/*.csv}` list/load/delete; `storage/postgres.py`: create `ds_<id>` schema, COPY, add FKs, setval.
 - `scripts/e2e_smoke.py`: `--schema all --rows 1000 [--llm]` → generate → validate → load → row counts → exit code.
+- F2.7 (added after the M2 gate): parent lookups in derived/after_column, aggregate recipes, conditional derived
+  expressions; heuristics encode subtotal/total, status↔dates, dates ≥ registration for the sample schemas.
 
 ## M3 — LLM-powered generation (`llm/`, `generation/planner.py`, `generation/pools.py`)
 - `llm/client.py`: `GeminiClient(settings)` with `generate_structured(schema|model, prompt, temperature)`,

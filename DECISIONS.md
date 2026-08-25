@@ -3,6 +3,12 @@
 Append-only log: what was decided, why, what was rejected, and the constraint it creates. New entries go on top.
 Reference an entry from code comments as `DECISIONS.md#YYYY-MM-DD-slug` when a choice looks odd out of context.
 
+## 2026-08-25: PROGRESS.md carries no git hash; bookkeeping happens before the commit
+- Incident: two independent verifiers found `make exit-check` red at milestone commits because PROGRESS.md's
+  "Latest commit"/"Active feature" lines were updated *after* committing (the hash is unknown before the commit).
+- Decision: drop the hash line (git is the source of truth), activate the next feature and update PROGRESS.md before
+  the commit, so every committed snapshot passes `exit-check` (the active-feature cross-check stays).
+
 ## 2026-08-25: Postgres identifiers are emitted lowercase *and* quoted
 - Reason: Postgres folds unquoted identifiers to lowercase. Talk-to-data SQL written by Gemini is unpredictable about
   quoting (`Library_Branches` vs `"Library_Branches"` vs `library_branches`). Emitting `"library_branches"` makes

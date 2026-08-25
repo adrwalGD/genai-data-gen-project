@@ -99,7 +99,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 - milestone: M2
 - state: passing
 - behavior: `generation.export.to_csv_bytes/to_zip_bytes` produce one UTF-8 CSV per table (ISO-8601 dates, NULL as empty) and a ZIP of all; `storage.datasets.save/load/list/delete` persist `data/datasets/<id>/{manifest.json, schema.ddl, tables/*.csv}` and round-trip a dataset losslessly.
-- verification: `make test K=export or datasets`
+- verification: `make test K='export or datasets'`
 - evidence: make test K='export or datasets' → 9 passed (CSV: quoted values, unquoted NULL, ISO dates, fixed decimals, booleans, escaped quotes; typed lossless round trip incl. expander output for all restaurant tables; actionable CsvFormatError; ZIP with per-table CSVs + schema.ddl + manifest.json; registry save/load/list/delete: atomic dir, manifest fields, plan/report/params/instructions round trip, newest-first listing skipping garbage, replace, DatasetNotFound incl. path traversal); make check green (2026-08-25)
 
 ### F2.5 — Postgres loader with post-load FK constraints
@@ -115,6 +115,13 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 - behavior: `scripts/e2e_smoke.py --schema all --rows 1000` generates with the heuristic planner, validates (must be clean), loads into Postgres, prints per-table counts and total time, exits 0; any violation or DB error exits 1 with an actionable message.
 - verification: `make db-up && make e2e`
 - evidence: make db-up && make e2e → OK   library: 9000 rows across 9 tables OK   restaurants: 7000 rows across 7 tables OK   company: 7000 rows across 7 tables e2e smoke: all 3 schema(s) passed  (each schema: parse → heuristic plan → expand 1000 rows/table → validator clean → save/load round trip → PostgreSQL load with FKs → counts match); make check green (2026-08-25)
+
+### F2.7 — Cross-column and cross-table consistency rules
+- milestone: M2
+- state: active
+- behavior: derived expressions and `after_column` may reference parent-row columns through a FK (`parent(menu_id).price`, `parent(customer_id).registration_date`); a new `aggregate` recipe fills parent columns from children after generation (`total_amount = sum(Order_Items.subtotal)`); derived expressions support conditionals/string constants for status columns (`'Returned' if return_date is not None else 'Checked Out'`); heuristics use these for the sample schemas so that Order_Items.subtotal = quantity × Menu.price, Orders.total_amount = Σ subtotals (0 for orders without items), order/review/loan dates ≥ the customer's/member's registration/join date, Book_Loans.loan_status agrees with return_date/due_date, and termination/return dates never fall after the anchor date; validator gains consistency checks for these relations when the plan declares them.
+- verification: `make test K=consistency && make e2e`
+- evidence: —
 
 ## M3 — LLM-powered generation
 
@@ -141,10 +148,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F3.4 — Engine end-to-end with Gemini
 - milestone: M3
-- state: not_started
+- state: passing
 - behavior: `generation.engine.generate(ddl, instructions, rows_per_table, temperature, seed, llm)` returns a validated `Dataset`; `scripts/e2e_smoke.py --llm --schema restaurants --rows 200` completes with a clean validator report, and the run is visible in Langfuse as trace `data_generation` with nested GENERATIONs.
 - verification: `make e2e-llm E2E_ARGS="--schema restaurants --rows 200"`
-- evidence: —
+- evidence: make test K='engine or pools or expander or planner' green (offline dataset valid with timings/params; FakeLLM planner+pools applied incl. row-count override and pool names; LLM failures degrade to notes with llm pool count 0); make e2e (offline via engine) → all 3 schemas passed; make test-llm K=engine → 1 passed (restaurants 60 rows/table with Gemini, report ok, pools from model, trace id present); make e2e-llm E2E_ARGS='--schema restaurants --rows 200' → OK, langfuse trace 0d96b63bb5b72d01510eda8d22409c33; make check green (2026-08-25)
 
 ## M4 — Feedback edits
 

@@ -23,11 +23,6 @@ progress_active=$(grep -oE '^- Active feature: (F[0-9]+\.[0-9]+|none)' PROGRESS.
 [ "$active" = "${progress_active:-?}" ] || problem "PROGRESS.md says active feature '${progress_active:-<missing>}' but docs/features.md says '$active'" \
   "set the '- Active feature:' line in PROGRESS.md to '$active' (or '- Active feature: none')"
 
-# 2c. PROGRESS.md "Latest commit" hash matches HEAD (the narrative must not drift from git)
-head=$(git rev-parse --short HEAD)
-progress_hash=$(grep -oE '^- Latest commit: `[0-9a-f]+`' PROGRESS.md | grep -oE '[0-9a-f]{7,}' | head -1)
-case "$head" in "$progress_hash"*) ;; *) case "$progress_hash" in "$head"*) ;; *) problem "PROGRESS.md 'Latest commit' is '${progress_hash:-<missing>}' but HEAD is '$head'" "update the '- Latest commit:' line in PROGRESS.md to $head";; esac;; esac
-
 # 3. debug leftovers
 hits=$(grep -rn --include='*.py' -E 'breakpoint\(\)|import pdb|pdb\.set_trace|st\.write\("debug|console\.log' src scripts tests || true)
 [ -n "$hits" ] && problem "debug leftovers:"$'\n'"$hits" "remove them"

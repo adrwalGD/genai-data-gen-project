@@ -285,10 +285,15 @@ def _suffix_unique(col: Column, value: Value, seen: set[Value]) -> Value:
             f"{col.name}: cannot make non-text value {value!r} unique after {UNIQUE_ATTEMPTS} tries"
         )
     limit = col.max_length
+    local, at, domain = value.partition("@")
     for k in range(2, 100_000):
         suffix = f"-{k}"
-        base = value if limit is None else value[: max(limit - len(suffix), 0)]
-        candidate = base + suffix
+        if at and domain and " " not in value:  # keep e-mail-like values valid: local-2@domain
+            room = None if limit is None else max(limit - len(suffix) - len(domain) - 1, 1)
+            candidate = f"{local if room is None else local[:room]}{suffix}@{domain}"
+        else:
+            base = value if limit is None else value[: max(limit - len(suffix), 0)]
+            candidate = base + suffix
         if limit is not None and len(candidate) > limit:
             break
         if candidate not in seen:

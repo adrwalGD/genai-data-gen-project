@@ -11,10 +11,13 @@
    - L1 static: `make lint typecheck arch-check`
    - L2 runtime: the feature's verification command (unit / integration / llm) — must actually run now
    - L3 system: `make check` (+ `make e2e` when the change touches generation/storage; `make test-ui` for UI)
-5. **Evidence**: `uv run python scripts/features.py pass F1.1 --evidence "make test K=parser → 18 passed; commit abc1234"`.
-   Evidence must name the command, the key output line(s), and a commit hash or Langfuse trace id where relevant.
-6. **Commit** one atomic change: `feat(schema): DDL parser → IR for sample schemas — needed by generation and loader`.
-7. **Record**: update PROGRESS.md (Current State, Completed, Next Steps). Then loop.
+5. **Evidence**: `uv run python scripts/features.py pass F1.1 --evidence "make test K=parser → 18 passed"`.
+   Evidence names the command and the key output line(s) (+ Langfuse trace id where relevant). Quote multi-word
+   filters: `make test K='export or datasets'`.
+6. **Bookkeeping before committing**: activate the next feature, update PROGRESS.md (Current State, Completed,
+   Next Steps). The commit then contains a consistent snapshot (`make exit-check` is green at every commit).
+   PROGRESS.md never duplicates the git hash — `git log -1` is the source of truth.
+7. **Commit** one atomic change: `feat(schema): F1.1 DDL parser → IR — needed by generation and loader`. Then loop.
 
 Never: start a second feature while one is `active`; mark `passing` from memory; refactor "while at it"; leave a
 failing `make check` for "next time"; silence a test to get green; pipe a gate command (`make check | tail`

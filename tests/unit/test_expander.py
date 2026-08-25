@@ -170,3 +170,21 @@ def test_not_null_fk_to_empty_parent_is_an_error(sample_ddl: dict[str, str]) -> 
     plan = heuristics.plan(schema, {"Restaurants": 0}, default_rows=10)
     with pytest.raises(ExpansionError, match="Restaurants has no rows"):
         expand(schema, plan, seed=1)
+
+
+def test_unique_email_suffixes_stay_valid_addresses() -> None:
+    import re
+
+    from genai_data_gen_project.generation.recipes import ConstantRecipe
+
+    schema = parse_ddl(
+        "CREATE TABLE Customers (id INT PRIMARY KEY, first_name VARCHAR(20) NOT NULL,"
+        " last_name VARCHAR(20) NOT NULL, email VARCHAR(40) UNIQUE NOT NULL);"
+    )
+    plan = heuristics.plan(schema, 300)
+    plan.table("Customers").column("first_name").recipe = ConstantRecipe(value="Ann")  # type: ignore[union-attr]
+    plan.table("Customers").column("last_name").recipe = ConstantRecipe(value="Lee")  # type: ignore[union-attr]
+    emails = expand(schema, plan, seed=1)["Customers"]["email"].tolist()
+    assert len(set(emails)) == 300 and all(len(e) <= 40 for e in emails)
+    pattern = re.compile(r"^[a-z0-9.]+(-\d+)?@[a-z0-9.-]+\.[a-z]+$")
+    assert all(pattern.match(e) for e in emails), [e for e in emails if not pattern.match(e)][:5]
