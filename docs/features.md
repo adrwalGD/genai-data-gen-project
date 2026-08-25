@@ -134,10 +134,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F3.3 — LLM text pools with parallel batches and deduplication
 - milestone: M3
-- state: not_started
+- state: passing
 - behavior: `generation.pools.fill_pools(plan, llm)` requests unique values for each text-pool brief in parallel batches, deduplicates, tops up short pools, and falls back to faker on failure; requesting 300 unique book titles returns ≥ 300 distinct strings ≤ VARCHAR length.
 - verification: `make test K=pools && make test-llm K=pools`
-- evidence: —
+- evidence: make test K=pools → 6 passed (pool sizing by uniqueness/cap, 3 batches of 50/50/20 with avoid-lists and instructions, dedupe + whitespace normalisation + VARCHAR truncation, top-up from Faker on short/duplicate responses, LLMError → Faker fallback without raising, deterministic offline mode); make test-llm K=pools → 1 passed (Gemini: ≥300 distinct book titles ≤ 255 chars, ≥250 from the model); make check green (2026-08-25)
 
 ### F3.4 — Engine end-to-end with Gemini
 - milestone: M3

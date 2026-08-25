@@ -6,10 +6,10 @@ summary plus anything that does not fit a feature entry.
 
 ## Current State
 - Milestone: **M3 LLM-powered generation** — F3.1 passing, F3.2 active. M2 features passing (gate verification running). Gates M0, M1: PASS.
-- Latest commit: `d06da77` (feat(llm): F3.1 Gemini client wrapper)
+- Latest commit: `475a7fd` (feat(generation): F3.2 LLM planner)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F3.2 (LLM planner merges over heuristics)
+- Active feature: F3.3 (LLM text pools, parallel batches, dedupe)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
