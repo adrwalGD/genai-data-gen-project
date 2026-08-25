@@ -261,7 +261,7 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F7.3 — Final full gate and demo dataset
 - milestone: M7
-- state: active
+- state: passing
 - behavior: `make check-all` is green; a demo dataset (restaurants, 1000 rows/table, LLM-generated) is saved and queryable; git tag `v1.0` created.
 - verification: `make check-all`
-- evidence: —
+- evidence: make check-all exit 0 (215 unit + 15 AppTest; test-int 18; test-llm 15 passed in 2:07 live; e2e 3 schemas); demo dataset smoke-restaurants akvhqbwyzncl 7 tables/10000 rows LLM-generated, loaded, read-only aggregate query ok (11 ms), trace 4f4371250c927e3bafd6e87f39784a12; docker stack healthy as uid 1000; tag v1.0

@@ -148,9 +148,9 @@ milestone gates were run by independent fresh-context verifier agents (see [PROG
 | 4:15 | *Top 5 restaurants by number of orders as a bar chart* | Second `run_sql` + `render_chart` → plotly bar chart |
 | 4:45 | Expand *SQL*; paste the trace id into Langfuse | Trace `talk_to_data_turn` with nested GENERATIONs and `tool.run_sql` span |
 
-A larger dataset (1000 rows/table, Gemini-generated) can be prepared before the demo with
+A larger dataset (1000 rows/table, Gemini-generated, ~2.5 minutes) can be prepared before the demo with
 `uv run python scripts/e2e_smoke.py --schema restaurants --rows 1000 --llm --keep` — it appears in the Talk to your
-data dataset list.
+data dataset list as `smoke-restaurants` (7 tables, 10 000 rows: Order_Items and Reviews are scaled up by the planner).
 
 ## Screenshots
 
