@@ -104,10 +104,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F2.5 — Postgres loader with post-load FK constraints
 - milestone: M2
-- state: not_started
+- state: passing
 - behavior: `storage.postgres.load_dataset(dataset)` creates schema `ds_<id>`, tables, COPYs rows, adds FK constraints, resets identity sequences; row counts match; loading the same dataset twice replaces it; works for all three samples at 1000 rows/table.
 - verification: `make test-int K=loader`
-- evidence: —
+- evidence: make test-int K=loader → 7 passed (library/restaurants/company × 1000 rows/table loaded into ds_<id> with all FK constraints present + schema comment; identity continues at 51 after 50 explicit ids; reload replaces; a dangling-FK reload fails atomically with LoadError and the previous version stays queryable; drop/list; redacted actionable connection error); make check green (2026-08-25)
 
 ### F2.6 — Offline end-to-end smoke across all sample schemas
 - milestone: M2
