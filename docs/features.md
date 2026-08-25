@@ -97,10 +97,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F2.4 — CSV/ZIP export and dataset persistence
 - milestone: M2
-- state: active
+- state: passing
 - behavior: `generation.export.to_csv_bytes/to_zip_bytes` produce one UTF-8 CSV per table (ISO-8601 dates, NULL as empty) and a ZIP of all; `storage.datasets.save/load/list/delete` persist `data/datasets/<id>/{manifest.json, schema.ddl, tables/*.csv}` and round-trip a dataset losslessly.
 - verification: `make test K=export or datasets`
-- evidence: —
+- evidence: make test K='export or datasets' → 9 passed (CSV: quoted values, unquoted NULL, ISO dates, fixed decimals, booleans, escaped quotes; typed lossless round trip incl. expander output for all restaurant tables; actionable CsvFormatError; ZIP with per-table CSVs + schema.ddl + manifest.json; registry save/load/list/delete: atomic dir, manifest fields, plan/report/params/instructions round trip, newest-first listing skipping garbage, replace, DatasetNotFound incl. path traversal); make check green (2026-08-25)
 
 ### F2.5 — Postgres loader with post-load FK constraints
 - milestone: M2

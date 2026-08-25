@@ -6,7 +6,7 @@ summary plus anything that does not fit a feature entry.
 
 ## Current State
 - Milestone: **M2 Deterministic generation core** — F2.1–F2.3 passing, F2.4 active. Gates M0, M1: PASS.
-- Latest commit: `fd9bc71` (fix(schema)+harness: M1 verifier findings)
+- Latest commit: `3d4b2ea` (fix: complete M1 verifier findings)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
 - Active feature: F2.4 (CSV/ZIP export + dataset persistence)
