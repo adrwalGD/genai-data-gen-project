@@ -372,5 +372,5 @@ def _text_recipe(schema: Schema, table: Table, col: Column) -> ColumnRecipe:
     if col.type is ColumnType.TEXT:
         return faker("paragraph", nb_sentences=2)
     if max_len <= 3:
-        return PatternRecipe(template="%" * max_len)
+        return PatternRecipe(template="%" * max_len, unique=col.unique)
     return faker("word") if max_len < 12 else FakerRecipe(provider="sentence", kwargs={"nb_words": 3})

@@ -83,10 +83,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F2.2 — Row expander honors every constraint class
 - milestone: M2
-- state: not_started
+- state: passing
 - behavior: `generation.expander.expand(schema, plan, seed)` yields N rows per table with sequential PKs, FK values that exist in parent tables (incl. deferred cyclic FKs filled in a second pass), unique columns unique, NOT NULL respected, null ratios applied to nullable columns, ENUM/CHECK/VARCHAR-length/DECIMAL-scale satisfied, dates within windows, deterministic for a fixed seed.
 - verification: `make test K=expander`
-- evidence: —
+- evidence: make test K=expander → 10 passed (3 sample schemas × 150 rows: NOT NULL, int/Decimal scale+precision, ENUM, VARCHAR length, date/datetime types, unique sets, FK containment incl. deferred cyclic FKs; library semantics: sequential PKs, 300 unique isbn/emails, due_date 14–28d after loan, return after loan, death after birth, available ≤ quantity; restaurants CHECK-bounded ratings, boolean ratio, unique license; determinism by seed; self-reference never self; text pools + fallback; pattern tokens; unique exhaustion + empty-parent errors); make check green (2026-08-25)
 
 ### F2.3 — Validator reports every violation class
 - milestone: M2
