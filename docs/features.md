@@ -164,10 +164,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F4.2 — Natural-language feedback becomes an EditPlan via Gemini
 - milestone: M4
-- state: passing
+- state: active
 - behavior: `generation.feedback.plan_edit(table, feedback, schema, llm)` turns "set all ratings below 3 to 3", "regenerate emails as firstname.lastname@example.org", "add 15 cancelled orders" into valid `EditPlan`s (structured output) that, once applied, satisfy the request and validate clean.
 - verification: `make test-llm K=feedback`
-- evidence: make test K=feedback → offline: draft→EditPlan for every op kind (incl. pattern/faker locale recipes via planner coercion), invalid drafts rejected with reasons, plan_edit retries once with the error (incl. conditional feedback without a where filter) and fails honestly twice, update_pool values fetched from the LLM and applied uniquely, recipe edits applied, sloppy filter types do not crash; make test-llm K=feedback → 3 passed with Gemini: 'set all ratings below 3 to 3' (only ratings < 3 changed), 'regenerate emails as firstname.lastname@example.org', 'add 15 cancelled orders' all applied with clean validation; make check green (2026-08-25)
+- evidence: reopened 2026-08-25: M4 gate FAIL — cross-table filter with a wrong parent attribute (parent(restaurant_id).cuisine) crashed with KeyError instead of EditError; prompt lacks parent-table columns
 
 ## M5 — UI: Data Generation
 
@@ -201,10 +201,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F5.5 — Dockerized app + database
 - milestone: M5
-- state: active
+- state: passing
 - behavior: `make docker-up` builds the image (python:3.14-slim + uv, ADC directory mounted read-only, `data/` volume) and starts postgres + app; `curl -fsS localhost:8501/_stcore/health` returns `ok`; the app can generate offline data and save it to the compose Postgres.
 - verification: `make docker-up && curl -fsS localhost:8501/_stcore/health`
-- evidence: —
+- evidence: make docker-up → image genai-data-gen-app built (python:3.14-slim + uv 0.11.15), genai-data-gen-app-1 Healthy alongside postgres; curl -fsS localhost:8501/_stcore/health → ok; in-container smoke via docker compose exec: DATABASE_URL host postgres, sample DDLs present under /app/project-spec, ADC file mounted, offline generation of restaurants (210 rows) saved to /app/data and loaded into the compose PostgreSQL (is_loaded True), cleaned up (2026-08-25)
 
 ## M6 — UI: Talk to your data
 

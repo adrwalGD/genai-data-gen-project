@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M5 UI — Data Generation** — F5.1–F5.4 passing, F5.5 active. M4 gate (+M3 re-check) verifier running. Gates M0, M1, M2: PASS.
+- Milestone: **M5 UI — Data Generation features all passing (F5.1–F5.5)**; M4 gate FAIL (narrow) → F4.2 reopened; M3 re-check PASS. Gates M0, M1, M2, M3: PASS.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F5.5 (Dockerized app + database)
+- Active feature: F4.2 (reopened after M4 gate FAIL — parent-attribute validation + prompt)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -46,6 +46,9 @@ summary plus anything that does not fit a feature entry.
 - [x] M5 F5.3 per-table feedback: quick-edit box + Submit → Gemini EditPlan applied, preview refreshed, history with ops.
 - [x] M5 F5.4 download CSV (table) / ZIP (all) + Save dataset (registry + PostgreSQL, graceful DB-down warning) → visible
       on Talk to your data.
+- [x] M5 F5.5 Docker: `make docker-up` builds and runs postgres + app (ADC mount, data volume, healthcheck); health ok;
+      in-container generation + save into the compose PostgreSQL verified.
+- [x] **Gate M3: PASS** (re-check 2026-08-25 at `5f557d3`): pools yield ×2, batch isolation, 5x row cap all confirmed.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -53,6 +56,10 @@ summary plus anything that does not fit a feature entry.
 - (none)
 
 ## Blocked / Known Issues
+- **Gate M4: FAIL (narrow)** (2026-08-25 at `5f557d3`): gate commands green, but the feedback 'make all Italian
+  restaurants' dishes cost between 30 and 40' → Gemini wrote `parent(restaurant_id).cuisine` (column is cuisine_type) →
+  raw KeyError; fix: validate parent attributes in filters (EditError → corrective retry), wrap filter evaluation,
+  show parent tables in the prompt, accept `fk.col` as an after_column alias. F4.2 reopened.
 - Lesson (2026-08-25, #3): `get_settings()` is lru-cached, so a test's monkeypatched env was ignored once another test
   had populated the cache — a save-dataset e2e test loaded into the dev Postgres. Autouse fixture now clears the cache.
 - **Gate M3: FAIL** (2026-08-25, verifier on `efb0cbe`): (1) Gemini `constant` override `salary='confidential'` crashed generation
@@ -80,8 +87,8 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. M5 UI: F5.5 Docker (compose app profile, ADC mount, healthcheck) → M5 gate.
-2. Run the M4 gate verifier (incl. M3 re-check: pools yield, batch isolation, row cap); record Gate M3/M4.
+1. Fix F4.2 (M4 findings) → re-verify M4 together with the M5 gate in one verifier run.
+2. M6 Talk to your data: F6.1 SQL guard → F6.2 agent → F6.3 charts → F6.4 page → F6.5 traces.
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)
