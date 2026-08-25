@@ -53,6 +53,8 @@ summary plus anything that does not fit a feature entry.
       run_readonly (READ ONLY txn, statement_timeout, search_path ds_<id>, hinted SqlError).
 - [x] M6 F6.2 chat agent: manual Gemini function-calling loop (run_sql, render_chart), corrections from SQL errors,
       streamed final answer, history recap, event stream for the UI; live tests (count, top-5 chart).
+- [x] **Gate M4: PASS** and **Gate M5: PASS** (2026-08-25 at `f2fd579`): live cross-table feedback applied twice cleanly,
+      hand-built typo → EditError with parent columns; all AppTests green; container healthy with DDLs/ADC/DB reachable.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -60,11 +62,12 @@ summary plus anything that does not fit a feature entry.
 - (none)
 
 ## Blocked / Known Issues
+- UX nits for F7.2 (from the M5 verifier): clear the feedback box after a successful Submit; cache the all-tables ZIP
+  bytes per dataset instead of recomputing on every rerun; rebuild the app image after code changes (`make docker-up`).
 - **Gate M4: FAIL (narrow)** (2026-08-25 at `5f557d3`): gate commands green, but the feedback 'make all Italian
   restaurants' dishes cost between 30 and 40' → Gemini wrote `parent(restaurant_id).cuisine` (column is cuisine_type) →
   raw KeyError; fix: validate parent attributes in filters (EditError → corrective retry), wrap filter evaluation,
-  show parent tables in the prompt, accept `fk.col` as an after_column alias. Fixed (F4.2 passing again); combined
-  M4+M5 re-verification pending.
+  show parent tables in the prompt, accept `fk.col` as an after_column alias. Fixed; M4 re-verified PASS.
 - Lesson (2026-08-25, #3): `get_settings()` is lru-cached, so a test's monkeypatched env was ignored once another test
   had populated the cache — a save-dataset e2e test loaded into the dev Postgres. Autouse fixture now clears the cache.
 - **Gate M3: FAIL** (2026-08-25, verifier on `efb0cbe`): (1) Gemini `constant` override `salary='confidential'` crashed generation
@@ -92,8 +95,8 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-1. Run the combined M4+M5 gate verifier on the F4.2-fix commit; record Gate M4/M5.
-2. M6 Talk to your data: F6.3 charts → F6.4 page → F6.5 traces.
+1. M6 Talk to your data: F6.3 charts → F6.4 page → F6.5 traces → M6 gate.
+2. M7 hardening: README/demo script, error UX (incl. verifier nits), `make check-all`, demo dataset, v1.0 tag.
 3. M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)

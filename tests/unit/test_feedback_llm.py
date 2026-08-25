@@ -214,3 +214,11 @@ def test_parent_attribute_typos_become_edit_errors_and_prompt_lists_parents(rest
             assert 30 <= float(price) <= 40
     assert parse_parent_ref("customer_id.registration_date") == ("customer_id", "registration_date")
     assert parse_parent_ref("registration_date") is None and parse_parent_ref("a.b.c") is None
+
+
+def test_retry_that_still_drops_the_filter_is_rejected(restaurants: Dataset) -> None:
+    unconditional = {"table": "Reviews", "ops": [{"op": "set_values", "column": "rating", "value": "3"}]}
+    fake = FakeLLM(structured={"EditPlanDraft": unconditional})
+    with pytest.raises(feedback.EditError, match=r"invalid edit plan twice.*no `where` filter"):
+        feedback.plan_edit(restaurants, "Reviews", "set all ratings below 3 to 3", fake)
+    assert len(fake.calls) == 2

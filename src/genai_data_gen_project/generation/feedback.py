@@ -623,6 +623,7 @@ def plan_edit(
         try:
             plan = draft_to_plan(draft, dataset)
             _check_ops(plan, table_obj, gplan, schema)
+            _check_conditions(plan, feedback)
         except EditError as e:
             raise EditError(f"Gemini produced an invalid edit plan twice: {e}") from e
     if fill_pools:
@@ -630,9 +631,9 @@ def plan_edit(
     return plan
 
 
-CONDITION_WORDS = re.compile(
-    r"\b(below|above|under|over|less than|more than|greater|smaller|before|after|older|younger|cheaper|"
-    r"more expensive|only|where|whose|which|that are|that have|with|without|between|except|but not)\b",
+CONDITION_WORDS = re.compile(  # row-filter words only; "between"/"with"/"only" also describe value ranges
+    r"\b(below|above|under|over|less than|more than|greater than|smaller than|before|after|older than|"
+    r"younger than|cheaper than|more expensive than|where|whose|that are|that have|except|but not)\b",
     re.IGNORECASE,
 )
 
