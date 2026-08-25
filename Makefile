@@ -6,6 +6,7 @@ UV ?= uv
 COMPOSE ?= docker compose
 PY := $(UV) run python
 K ?=
+PORT ?= 8501
 PYTEST_K := $(if $(K),-k "$(K)",)
 E2E_ARGS ?= --schema all --rows 1000
 
@@ -77,7 +78,7 @@ check-env: ## verify ADC→Vertex, Langfuse, Postgres with actionable messages
 > $(PY) scripts/check_env.py
 
 run: ## run the Streamlit app locally
-> $(UV) run streamlit run src/genai_data_gen_project/ui/app.py
+> $(UV) run streamlit run src/genai_data_gen_project/ui/app.py --server.port $(PORT)
 
 e2e: ## offline end-to-end smoke: generate → validate → load   (E2E_ARGS="--schema all --rows 1000")
 > $(PY) scripts/e2e_smoke.py $(E2E_ARGS)
@@ -86,6 +87,7 @@ e2e-llm: ## end-to-end smoke with Gemini
 > $(PY) scripts/e2e_smoke.py --llm $(E2E_ARGS)
 
 docker-up: ## build and run postgres + app in docker (app on :8501)
+>mkdir -p data/datasets
 > $(COMPOSE) --profile app up --build -d --wait
 
 docker-down: ## stop the docker stack

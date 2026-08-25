@@ -247,14 +247,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F7.1 — README and demo walkthrough
 - milestone: M7
-- state: active
+- state: passing
 - behavior: README covers purpose, architecture (diagram), prerequisites (gcloud ADC), setup (`make setup`), run (local + Docker), verification commands, a 5-minute demo script for the professor and screenshots; a fresh reader can run the app following only the README.
 - verification: independent verifier follows README from a clean clone and reports PASS
-- evidence: —
+- evidence: independent verifier (clean clone of d89b716) followed README: make setup/db-up/check-env/check (205 unit + 12 AppTest)/test-int (18)/test-llm K='client and structured' (1)/e2e (3 schemas)/streamlit run all exit 0; 11 wording findings folded into README → F7.1: PASS
 
 ### F7.2 — Actionable errors and UX polish
 - milestone: M7
-- state: not_started
+- state: active
 - behavior: DDL parse errors show line context; Vertex 429/5xx show a retry hint; empty query results and guard rejections are explained in the chat; long generations show per-table progress; no raw tracebacks reach the UI.
 - verification: `make test-ui K=errors`
 - evidence: —

@@ -61,8 +61,8 @@ id is shown in the UI under *Generation details* and under each answer.
 
 ## Prerequisites
 
-- Linux/macOS with **GNU make**, **Docker + Compose v2**, **[uv](https://docs.astral.sh/uv/)** (installs Python 3.14
-  itself) and the **gcloud SDK**.
+- Linux/macOS with **GNU make ≥ 4** (the Makefile uses `.RECIPEPREFIX`; on macOS `brew install make` and use `gmake`),
+  **Docker + Compose v2**, **[uv](https://docs.astral.sh/uv/)** (installs Python 3.14 itself) and the **gcloud SDK**.
 - A Google account with Vertex AI access to project `gd-gcp-gridu-genai` (see
   `project-spec/gemini-access-instructions.md`). Authentication is Application Default Credentials — no API keys.
 - Optional: Langfuse keys in `project-spec/creds.local` (`LANGFUSE_PUBLIC_KEY=…`, `LANGFUSE_SECRET_KEY=…`). Without
@@ -84,7 +84,7 @@ work for the compose stack. Secrets never leave `.env` / `project-spec/creds.loc
 ## Run
 
 ```bash
-make run          # local Streamlit on http://localhost:8501 (PostgreSQL from make db-up)
+make run          # local Streamlit on http://localhost:8501 (PostgreSQL from make db-up); make run PORT=8502 to change
 make docker-up    # full stack in Docker: postgres + app on http://localhost:8501 (rebuilds the image)
 make docker-down  # stop the stack (data volume is kept)
 ```
@@ -96,13 +96,14 @@ The Docker app container mounts `~/.config/gcloud` read-only as ADC (override wi
 
 ### Data Generation
 1. **Schema** — *Upload file* (`.sql`, `.txt`, `.ddl`), *Sample schema* (`restaurants`, `library`, `company` from
-   `project-spec/`) or *Paste DDL*. The schema is parsed immediately; tables, columns and FKs are listed (parse errors
-   name the statement).
-2. **Instructions and parameters** — a free-text prompt (e.g. *Italian and Polish restaurants in Kraków; realistic
-   dish names; reviews in English*), then *Temperature*, *Rows per table* (default 100, max `MAX_ROWS_PER_TABLE`),
-   *Seed* and the *Use Gemini* toggle (off = offline heuristics + Faker, useful without network). **Generate** shows
+   `project-spec/`) or *Paste DDL*. The schema is parsed immediately: the table list is confirmed and *Tables, columns and
+   keys* / *Show DDL* expanders show the parsed structure; parse errors quote the failing line with a caret.
+2. **Instructions and parameters** — a free-text prompt (e.g. *family-run Italian and Indian restaurants in New
+   Jersey; realistic dish names; reviews in English*), then, in the *Advanced parameters* expander, *Temperature*,
+   *Rows per table* (default 100, max `MAX_ROWS_PER_TABLE`), *Seed* and the *Use Gemini* toggle (off = offline
+   heuristics + Faker, useful without network). **Generate** shows
    per-stage progress (plan → text pools → expand → validate).
-3. **Data preview** — one table at a time (selectbox), with row/column metrics and the validation result.
+3. **Data preview** — one table at a time (selectbox), with the row count and the validation result.
 4. **Feedback** — type an instruction for the selected table and **Submit**, e.g. *set every rating of Italian
    restaurants to 5*, *make 30% of the orders cancelled*, *use only Polish first names*. Gemini turns the text into a
    structured edit plan, the plan is applied deterministically, dependent/aggregate columns are recomputed and the
@@ -115,9 +116,9 @@ The Docker app container mounts `~/.config/gcloud` read-only as ADC (override wi
 Pick a saved dataset (*Load into PostgreSQL* appears if it is only on disk), then ask in the chat box:
 *How many orders were placed last month?*, *Top 5 restaurants by revenue as a bar chart*, *Average rating per
 cuisine*. Gemini answers through function calling: `run_sql` executes guarded read-only SQL (single `SELECT`, `READ
-ONLY` transaction, statement timeout, row cap) and `render_chart` draws bar/line/scatter/pie charts with plotly; the
-final answer streams token by token. Every SQL statement and result table is shown in an expander under the answer,
-followed by the Langfuse trace id. *Clear chat* resets the conversation.
+ONLY` transaction, statement timeout, row cap) and `render_chart` draws bar/line/scatter/pie/histogram charts with
+plotly; the final answer streams token by token. Each SQL statement appears in an expander with its result table
+below it, then the streamed answer, then the Langfuse trace id (paste it into the Langfuse search box). *Clear chat* resets the conversation.
 
 ## Verification
 
@@ -138,14 +139,14 @@ milestone gates were run by independent fresh-context verifier agents (see [PROG
 | Time | Step | What to show |
 |---|---|---|
 | 0:00 | `make db-up && make run`, open http://localhost:8501 | Sidebar tabs *Data Generation* / *Talk to your data* |
-| 0:30 | Schema → *Sample schema* → `restaurants` | Parsed tables with PK/FK summary; *Show DDL* |
-| 1:00 | Instructions: *Italian and Polish restaurants in Kraków; realistic dish names; reviews in English* · Rows per table **200** · **Generate** | Progress log: plan (Gemini structured output), text pools (parallel Gemini calls), expand, validate = OK |
+| 0:30 | Schema → *Sample schema* → `restaurants` | Parsed table list; *Tables, columns and keys* and *Show DDL* expanders |
+| 1:00 | Instructions: *family-run Italian and Indian restaurants in New Jersey; realistic dish names; reviews in English* · Rows per table **200** · **Generate** | Progress log: plan (Gemini structured output), text pools (parallel Gemini calls), expand, validate = OK |
 | 2:00 | Preview `Restaurants`, `Menu`, `Orders` | Realistic names/dishes/prices; FK ids point to existing parents; dates in range |
-| 2:30 | Feedback on `Restaurants`: *ratings for Italian restaurants should be between 4 and 5* → **Submit** | Structured edit plan, "35 rows affected", re-validation; preview updates |
+| 2:30 | Feedback on `Restaurants`: *ratings for Italian restaurants should be between 4 and 5* → **Submit** | Structured edit plan, "N rows affected" (35 in the screenshot), re-validation; preview updates |
 | 3:15 | *Download ZIP (all tables)*; name it `restaurants-demo` → **Save dataset** | Saved to `data/datasets/<id>/` and loaded into PostgreSQL `ds_<id>` |
 | 3:45 | Talk to your data → *How many customers placed more than one order?* | `run_sql` call with SQL + table, streamed answer |
 | 4:15 | *Top 5 restaurants by number of orders as a bar chart* | Second `run_sql` + `render_chart` → plotly bar chart |
-| 4:45 | Expand *SQL*, click the Langfuse trace id | Trace `talk_to_data_turn` with nested GENERATIONs and `tool.run_sql` span |
+| 4:45 | Expand *SQL*; paste the trace id into Langfuse | Trace `talk_to_data_turn` with nested GENERATIONs and `tool.run_sql` span |
 
 A larger dataset (1000 rows/table, Gemini-generated) can be prepared before the demo with
 `uv run python scripts/e2e_smoke.py --schema restaurants --rows 1000 --llm --keep` — it appears in the Talk to your
@@ -185,7 +186,7 @@ evidence required to pass), [docs/loop.md](docs/loop.md) the work loop and gate-
 
 ## Troubleshooting
 
-Symptom → fix table in [docs/environment.md](docs/environment.md). The most common: ADC expired →
+Symptom → fix list in [docs/environment.md](docs/environment.md). The most common: ADC expired →
 `gcloud auth application-default login`; `429 RESOURCE_EXHAUSTED` → lower `LLM_MAX_CONCURRENCY`; PostgreSQL
 `connection refused` → `make db-up`; Langfuse auth failure → keys are for the EU host `https://cloud.langfuse.com`.
 
