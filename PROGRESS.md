@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M1 Schema engine** — F1.1 passing; M0 gate verification running (independent verifier).
-- Latest commit: `2fd12fb` (feat(schema): F1.1 DDL parser → IR)
+- Milestone: **M1 Schema engine** — F1.1, F1.2 passing; M0 gate verification running (independent verifier).
+- Latest commit: `__F12__` (feat(schema): F1.2 generation order with cycle breaking)
 - `make check`: green (ruff, mypy 11 files, arch-check 7 rules, unit 5 passed, e2e 3 passed)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F1.2 (generation order with cycle breaking)
+- Active feature: F1.3 (Postgres DDL emitter, unit + integration)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -27,6 +27,9 @@ summary plus anything that does not fit a feature entry.
 - (none)
 
 ## Blocked / Known Issues
+- Lesson (2026-08-25): a piped `make check | tail` hid a mypy failure and F1.1 was marked passing on a red gate;
+  fixed by amending the commit after a green run and by mechanical gating (`.harness/check.ok` marker required
+  by `features.py pass`; see DECISIONS.md). Never pipe gate commands.
 - `gemini-2.5-*` models return empty `.text` when `max_output_tokens` is small and thinking is enabled → always pass
   `ThinkingConfig(thinking_budget=0)` (or a deliberate budget) — to be encoded in `llm/client.py` defaults (F3.1).
 - `gcloud auth list` shows no account but the ADC file (`~/.config/gcloud/application_default_credentials.json`,
@@ -47,6 +50,9 @@ summary plus anything that does not fit a feature entry.
 4. M2: recipes/heuristics → expander → validator → export/datasets → loader → `scripts/e2e_smoke.py` (`make e2e`).
 
 ## Session log (newest first)
+- **2026-08-25 (session 1, cont.)** — M0 committed (`38572e8`); independent M0 gate verifier launched; F1.1 DDL
+  parser → IR passing (16 tests) and committed; harness hardened after the piped-gate incident; F1.2 generation
+  order with cycle breaking passing (6 tests) and committed.
 - **2026-08-25 (session 1)** — Research + harness authoring + M0. Verified Vertex/Gemini features, Langfuse host,
   deps on Python 3.14, sqlglot coverage of sample DDLs. Wrote the harness (CLAUDE.md, PROGRESS.md, DECISIONS.md,
   docs/*), Makefile, pyproject/uv.lock, compose + Dockerfile, config/observability modules, harness scripts, first

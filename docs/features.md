@@ -53,14 +53,14 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F1.2 — Generation order with cycle breaking
 - milestone: M1
-- state: active
+- state: passing
 - behavior: `schema.order.generation_order(schema)` returns tables so that every non-nullable FK target precedes its source; cycles (library: Branches↔Employees↔Departments) are broken at nullable FKs which are reported as `deferred_fks` to fill in a second pass; a cycle made only of NOT NULL FKs raises `UnsatisfiableSchemaError`.
 - verification: `make test K=order`
-- evidence: —
+- evidence: make test K=order → 6 passed (restaurants/company DAGs; library cycles deferred at Library_Branches.manager_id and Employees.department_id; self-reference deferred; mixed cycle defers nullable side; NOT NULL cycle → UnsatisfiableSchemaError naming both FKs); make check green (2026-08-25)
 
 ### F1.3 — Postgres DDL emitter creates all sample schemas in a real database
 - milestone: M1
-- state: not_started
+- state: active
 - behavior: `schema.postgres_ddl.emit_tables(schema)` + `emit_foreign_keys(schema)` produce DDL that executes in Postgres 17 for all three samples inside a fresh schema (`ENUM`→`VARCHAR`+`CHECK`, `AUTO_INCREMENT`→identity, `DATETIME`→`TIMESTAMP`, quoted identifiers preserving case-insensitive names), and `information_schema` reflects every column.
 - verification: `make test K=postgres_ddl && make test-int K=postgres_ddl`
 - evidence: —
