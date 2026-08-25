@@ -4,7 +4,7 @@
 ```
 ui/            Streamlit pages: render state, call services, never talk to Gemini/Postgres/sqlglot directly
 chat/  generation/       use-case services: talk-to-data agent · generation engine, planner, feedback
-storage/  schema/  llm/  infrastructure: datasets + Postgres + sql_guard · DDL→IR→DDL · Gemini client wrapper
+storage/  schema/  llm/  infrastructure: Dataset record, CSV codec, registry, Postgres loader, sql_guard · DDL→IR→DDL · Gemini
 config.py  observability.py   settings (.env) · Langfuse/OpenInference init + logging
 ```
 Allowed imports: `ui → chat, generation, storage(datasets list/load only), schema(parse for preview), config`;
@@ -18,7 +18,7 @@ DDL text ──parse_ddl──▶ Schema IR ──heuristics.plan──▶ base 
 GenerationPlan ──pools.fill_pools (LLM, parallel)──▶ text pools
 GenerationPlan + pools ──expander.expand(seed)──▶ {table: DataFrame}  (dependency order, deferred cyclic FKs)
 {table: DataFrame} ──validator.validate──▶ ValidationReport (must be ok)
-Dataset ──export──▶ CSV/ZIP bytes      Dataset ──storage.datasets.save──▶ data/datasets/<id>/
+Dataset ──generation.export (storage.csvio)──▶ CSV/ZIP bytes      Dataset ──storage.datasets.save──▶ data/datasets/<id>/
 Dataset ──storage.postgres.load_dataset──▶ schema ds_<id> (tables → COPY → FKs → setval)
 feedback text ──feedback.plan_edit (LLM)──▶ EditPlan ──feedback.apply──▶ Dataset' ──validate──▶ report
 ```
@@ -35,7 +35,8 @@ Each turn = Langfuse trace `talk_to_data_turn` (session_id = Streamlit session i
 ## Core types
 - `schema.models.Schema / Table / Column / ForeignKey / CheckConstraint` — pydantic, dialect-neutral IR.
 - `generation.recipes.ColumnRecipe` (discriminated union) + `TablePlan` + `GenerationPlan` — what to generate.
-- `generation.engine.Dataset{id, schema, ddl, tables: dict[str, DataFrame], plan, report, created_at}`.
+- `storage.dataset.Dataset{id, name, ddl, schema, tables: dict[str, DataFrame], plan (json), report (json), params,
+  created_at}` — lives in `storage/` so persistence/loader never import service layers (arch-check R6).
 - `generation.validator.ValidationReport{ok, issues: list[Issue]}`.
 - `generation.feedback.EditPlan{ops: list[EditOp]}`.
 - `chat.charts.ChartSpec`; `chat.agent.AgentEvent` (tool_call | tool_result | text_delta | final | error).

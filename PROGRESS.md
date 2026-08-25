@@ -5,11 +5,11 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M2 Deterministic generation core** — F2.1–F2.3 passing, F2.4 active. Gates M0, M1: PASS.
-- Latest commit: `a2e7af6` (feat(storage): F2.4 export + dataset registry)
+- Milestone: **M2 Deterministic generation core — all features passing (F2.1–F2.6)**; M2 gate verification pending. Gates M0, M1: PASS.
+- Latest commit: `b644a94` (feat(storage): F2.5 Postgres loader)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 1 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: F2.5 (Postgres loader with post-load FK constraints)
+- Active feature: F3.1 (Gemini client wrapper)
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -27,6 +27,8 @@ summary plus anything that does not fit a feature entry.
       discrepancies applied (TokenError caught, compose project name, fallback/unknown-type notes, docs corrected).
 - [x] M1 F1.1 DDL parser → IR (16 tests) · F1.2 generation order + cycle breaking (6) · F1.3 Postgres DDL emitter
       (19 unit + 4 integration: 3 sample schemas created in PostgreSQL 17, constraints enforced) · F1.4 prompt summary (4).
+- [x] M2 F2.1 recipes + heuristic planner · F2.2 expander · F2.3 validator · F2.4 CSV/ZIP + dataset registry ·
+      F2.5 Postgres loader (1000 rows/table × 3 schemas with FKs) · F2.6 `make e2e` offline smoke green.
 - [x] Harness: CLAUDE.md (88 lines), docs/{PLAN,features,loop,architecture,gemini-rules,db-rules,testing,ui-rules,environment}.md,
       DECISIONS.md, Makefile, scripts/{features.py,arch_check.sh,exit_check.sh,check_env.py}.
 
@@ -51,10 +53,10 @@ summary plus anything that does not fit a feature entry.
 - `[project.scripts] genai-data-gen` points at `cli.py`, which imports `ui/app.py` that does not exist until F5.1.
 
 ## Next Steps
-0. M1 gate → independent verifier on the M1 commit; record `Gate M1`.
-1. M2: F2.1 recipes + heuristic planner → F2.2 expander → F2.3 validator → F2.4 export/datasets → F2.5 loader →
-   F2.6 `scripts/e2e_smoke.py` (`make e2e`, 3 schemas × 1000 rows, clean validator, loaded with FKs).
-2. M3 LLM planner/pools/engine; M4 feedback; M5/M6 UI; M7 hardening (docs/PLAN.md).
+1. M2 gate → independent verifier on the M2 commit; record `Gate M2`.
+2. M3: F3.1 `llm/client.py` (structured/stream/tools, retries, thinking budget, Langfuse) → F3.2 planner → F3.3 pools →
+   F3.4 engine + `make e2e-llm`.
+3. M4 feedback; M5/M6 UI; M7 hardening (docs/PLAN.md).
 
 ## Session log (newest first)
 - **2026-08-25 (session 1, cont.)** — M0 committed (`38572e8`); independent M0 gate verifier launched; F1.1 DDL

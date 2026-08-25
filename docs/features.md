@@ -111,10 +111,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 
 ### F2.6 — Offline end-to-end smoke across all sample schemas
 - milestone: M2
-- state: not_started
+- state: passing
 - behavior: `scripts/e2e_smoke.py --schema all --rows 1000` generates with the heuristic planner, validates (must be clean), loads into Postgres, prints per-table counts and total time, exits 0; any violation or DB error exits 1 with an actionable message.
 - verification: `make db-up && make e2e`
-- evidence: —
+- evidence: make db-up && make e2e → OK   library: 9000 rows across 9 tables OK   restaurants: 7000 rows across 7 tables OK   company: 7000 rows across 7 tables e2e smoke: all 3 schema(s) passed  (each schema: parse → heuristic plan → expand 1000 rows/table → validator clean → save/load round trip → PostgreSQL load with FKs → counts match); make check green (2026-08-25)
 
 ## M3 — LLM-powered generation
 
