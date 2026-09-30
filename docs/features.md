@@ -265,3 +265,10 @@ Each entry: behavior (observable), verification (executable), state, evidence. K
 - behavior: `make check-all` is green; a demo dataset (restaurants, 1000 rows/table, LLM-generated) is saved and queryable; git tag `v1.0` created.
 - verification: `make check-all`
 - evidence: make check-all exit 0 (215 unit + 15 AppTest; test-int 18; test-llm 15 passed in 2:07 live; e2e 3 schemas); demo dataset smoke-restaurants akvhqbwyzncl 7 tables/10000 rows LLM-generated, loaded, read-only aggregate query ok (11 ms), trace 4f4371250c927e3bafd6e87f39784a12; docker stack healthy as uid 1000; tag v1.0
+
+### F7.4 — Requirement screenshots and parallel tool-call fix (post-v1.0)
+- milestone: M7
+- state: passing
+- behavior: docs/screenshots holds one live screenshot per PROJECT.md UI/functional requirement (upload, instructions + temperature, Generate progress, per-table preview, feedback + Submit, CSV/ZIP + save, dataset in Talk to your data, text/table/plot answers), mapped in the README; the agent answers parallel function calls of one model turn with a single function-response turn (Gemini 400 otherwise); the system prompt asks for `DESC NULLS LAST` in top-N queries and for percentages computed in SQL.
+- verification: `make test K='parallel or function_response'` + live Playwright walkthrough of the app
+- evidence: Playwright MCP walkthrough of make run PORT=8502 (Gemini on, 2026-09-30): library_mgm_schema.ddl uploaded → 9 tables/2615 rows OK (trace a7b3c996775d5237264aa2cd3c60c7d1), 2 feedback edits on Book_Loans (79 + 144 rows), ZIP = 9 CSV + ddl + manifest, saved library-demo vtlfctz3gsxz into PostgreSQL, 4 chat turns (text, table+SQL, bar, pie) → 12 shots in docs/screenshots mapped in README; before the fix a 2-call question returned Gemini 400 'number of function response parts' (trace cb6702300ae2fdbd0c0595ad63f347b3), after it answered (trace 989f33bbb8a73517db24d8e86ed468db); top-10 fines now DESC NULLS LAST; make test K='parallel or function_response or llm_client' 12 passed (new test fails without the fix: 3 turns != 2); make check green (216 unit + 15 AppTest); make test-llm K='agent or trace' 3 passed

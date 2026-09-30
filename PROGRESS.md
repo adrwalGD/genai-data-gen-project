@@ -5,12 +5,12 @@ Feature-level state lives in `docs/features.md` (machine-readable, `make feature
 summary plus anything that does not fit a feature entry.
 
 ## Current State
-- Milestone: **M7 Hardening & presentation — complete**: all 35 features passing, `make check-all` green, tag `v1.0`.
+- Milestone: **M7 Hardening & presentation — complete**: all 36 features passing (F7.4 post-v1.0), tag `v1.0` + F7.4.
   Gates M0–M7: PASS. Project complete; post-v1.0 backlog below.
 - Latest commit: see `git log --oneline -1` (not duplicated here — it drifted twice)
 - `make check`: green (counts in the command output; do not hand-copy them here)
 - `make test-int`: 18 passed (PostgreSQL 17.11 via compose) · `make check-env`: all PASS (Vertex 2.2 s, Langfuse trace `f97f543d…`)
-- Active feature: none — all 35 features passing; Gate M7 PASS
+- Active feature: none — all 36 features passing; Gate M7 PASS
 
 ## Completed
 - [x] Spec analysed (`project-spec/PROJECT.md`, 3 sample DDLs, sample UI); harness-engineering lectures 1–14 read.
@@ -95,6 +95,10 @@ summary plus anything that does not fit a feature entry.
   d89b716→v1.0 verified claim by claim; PROJECT.md traceability: every Phase 1/2–3 and technical requirement MET (file:line +
   test per row); hard constraints hold (no model literals outside config.py, no API keys, no print, no secrets tracked).
   7 findings, none blocking → Known Issues / backlog.
+- [x] M7 F7.4 (post-v1.0, 2026-09-30) requirement screenshots: 12 live shots via Playwright MCP (upload, parameters,
+  progress, preview, generation details, feedback, download/save, dataset selector, text/table/bar/pie answers) mapped
+  to PROJECT.md in the README; fixed parallel tool calls (one function-response turn per model turn — Gemini returned 400
+  for multi-query questions); prompt: `DESC NULLS LAST` for top-N, percentages computed in SQL.
 
 ## In Progress
 - (none)
@@ -159,6 +163,17 @@ summary plus anything that does not fit a feature entry.
 3. nit: `DEFAULT_ROWS_PER_TABLE` only feeds dict-shaped engine requests; the UI default (100) is hardcoded in ui/state.py.
 4. cleanup: throwaway dataset `shot-offline` (i6qedhs753oo) still listed (see item 10 above).
 
+### F7.4 walkthrough findings (2026-09-30) — not fixed, outside F7.4
+1. realism: `Books.title` pool — Gemini returned too few unique titles, so 157 of 500 came from Faker catch-phrases
+   ("Triple-buffered responsive approach"); surfaced as a note in Generation details. Over-request or a second pool round.
+2. consistency: `Book_Loans.loan_status` vs `return_date` are independent (Returned rows with NULL return_date, Overdue rows
+   with one) even though the LLM override note claims the date is "derived from loan_status" — needs a conditional recipe.
+3. feedback: "set return_date to 3 days before due_date" → Gemini wrote `parent(due_date) - timedelta(days=3)` as a literal
+   value → actionable error "cannot store … in a DATETIME column" (dataset unchanged). Row-relative date arithmetic in
+   set_values is not supported by the EditPlan expression language (or the prompt does not steer to it).
+4. cleanup: dataset `library-demo` (vtlfctz3gsxz) was created for the screenshots and is kept as a second demo dataset.
+   `.playwright-mcp/` (Playwright MCP output: raw shots, downloads, console logs) is now gitignored.
+
 ## Next Steps
 1. Demo rehearsal with README's 5-minute script against `smoke-restaurants` (app on :8501 via `make docker-up`).
 2. Before the demo: delete the throwaway dataset `shot-offline` (i6qedhs753oo) — the deletion was blocked by the tool
@@ -167,6 +182,8 @@ summary plus anything that does not fit a feature entry.
    clickable Langfuse trace links (needs the project id in settings).
 
 ## Session log (newest first)
+- **2026-09-30 (session 3)** — F7.4: live Playwright walkthrough, 12 requirement screenshots + README table; fixed the
+  parallel function-call 400 in the chat agent; two prompt rules (NULLS LAST, SQL-side percentages); 4 findings recorded.
 - **2026-08-25 (session 2)** — F6.5 per-turn Langfuse traces (42082ce); Gate M6 PASS by independent verifier (8 findings
   recorded); F7.1 README + screenshots via headless Chrome (d89b716), verified from a clean clone → PASS, findings folded
   in; F7.2 hardening (streamed-call retries, guard DML-in-CTE, explained chat errors, parse-error context, UID-1000 image)

@@ -142,7 +142,7 @@ milestone gates were run by independent fresh-context verifier agents (see [PROG
 | 0:30 | Schema → *Sample schema* → `restaurants` | Parsed table list; *Tables, columns and keys* and *Show DDL* expanders |
 | 1:00 | Instructions: *family-run Italian and Indian restaurants in New Jersey; realistic dish names; reviews in English* · Rows per table **200** · **Generate** | Progress log: plan (Gemini structured output), text pools (parallel Gemini calls), expand, validate = OK |
 | 2:00 | Preview `Restaurants`, `Menu`, `Orders` | Realistic names/dishes/prices; FK ids point to existing parents; dates in range |
-| 2:30 | Feedback on `Restaurants`: *ratings for Italian restaurants should be between 4 and 5* → **Submit** | Structured edit plan, "N rows affected" (35 in the screenshot), re-validation; preview updates |
+| 2:30 | Feedback on `Restaurants`: *ratings for Italian restaurants should be between 4 and 5* → **Submit** | Structured edit plan, "N rows affected", re-validation; preview updates |
 | 3:15 | *Download ZIP (all tables)*; name it `restaurants-demo` → **Save dataset** | Saved to `data/datasets/<id>/` and loaded into PostgreSQL `ds_<id>` |
 | 3:45 | Talk to your data → *How many customers placed more than one order?* | `run_sql` call with SQL + table, streamed answer |
 | 4:15 | *Top 5 restaurants by number of orders as a bar chart* | Second `run_sql` + `render_chart` → plotly bar chart |
@@ -154,13 +154,23 @@ data dataset list as `smoke-restaurants` (7 tables, 10 000 rows: Order_Items and
 
 ## Screenshots
 
-| Data Generation — preview of Gemini-generated data | Feedback edit applied and logged |
+One live run of the app (Gemini on, 2026-09-30): `library_mgm_schema.ddl` uploaded → generated → refined → saved as
+`library-demo` → queried. The sidebar with both main tabs is visible in every shot.
+
+| Requirement (project-spec/PROJECT.md) | Screenshot |
 |---|---|
-| ![Data Generation](docs/screenshots/data-generation.png) | ![Feedback](docs/screenshots/feedback.png) |
-
-Talk to your data — SQL result table, plotly chart from `render_chart`, streamed answer and the Langfuse trace id:
-
-![Talk to your data](docs/screenshots/talk-to-data.png)
+| Upload a DDL file (.sql/.txt/.ddl); tables, columns and keys parsed | ![Schema upload](docs/screenshots/01-schema-upload.png) |
+| Text instructions (prompt), temperature and other parameters, **Generate** button | ![Instructions and parameters](docs/screenshots/02-instructions-parameters.png) |
+| Generation runs after clicking Generate (live progress: Gemini plan, text pools, validation) | ![Generation progress](docs/screenshots/03-generation-progress.png) |
+| Preview of each generated table; constraint validation summary (FKs, NOT NULL, ENUM…) | ![Data preview](docs/screenshots/04-data-preview.png) |
+| Generation details: Gemini structured-output plan notes and the Langfuse trace id | ![Generation details](docs/screenshots/05-generation-details.png) |
+| Modify a table with textual feedback + **Submit** (fixes the status/return-date mismatch visible in the preview above; structured EditPlan shown) | ![Feedback](docs/screenshots/06-feedback.png) |
+| Download CSV / ZIP and store the dataset in the system (PostgreSQL) | ![Download and save](docs/screenshots/07-download-save.png) |
+| Stored datasets are accessible in the *Talk to your data* tab | ![Dataset selector](docs/screenshots/08-talk-dataset-selector.png) |
+| Talk to your data — text answer (two parallel `run_sql` calls, streamed answer) | ![Text answer](docs/screenshots/09-talk-text-answer.png) |
+| Talk to your data — table result with the generated SQL | ![Table and SQL](docs/screenshots/10-talk-table-sql.png) |
+| Talk to your data — plot (`render_chart` → plotly bar chart) | ![Bar chart](docs/screenshots/11-talk-bar-chart.png) |
+| Talk to your data — plot (pie chart) | ![Pie chart](docs/screenshots/12-talk-pie-chart.png) |
 
 ## Repository layout
 
