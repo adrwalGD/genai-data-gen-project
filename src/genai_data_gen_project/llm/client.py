@@ -406,6 +406,14 @@ def function_response(name: str, response: dict[str, Any]) -> Any:
     return types.Content(role="user", parts=[types.Part.from_function_response(name=name, response=response)])
 
 
+def function_responses(responses: list[tuple[str, dict[str, Any]]]) -> Any:
+    """One user turn answering every parallel call of a model turn (Gemini rejects N turns for N calls)."""
+    from google.genai import types
+
+    parts = [types.Part.from_function_response(name=name, response=response) for name, response in responses]
+    return types.Content(role="user", parts=parts)
+
+
 def user_content(text: str) -> Any:
     from google.genai import types
 

@@ -153,6 +153,8 @@ def test_stream_and_tool_turns() -> None:
     assert cfg.automatic_function_calling.disable is True and len(cfg.tools) == 1
     resp = llm.function_response("run_sql", {"rows": [[1]]})
     assert resp.role == "user" and resp.parts[0].function_response.name == "run_sql"
+    both = llm.function_responses([("run_sql", {"rows": [[1]]}), ("render_chart", {"ok": True})])
+    assert [p.function_response.name for p in both.parts] == ["run_sql", "render_chart"]
 
 
 def test_pro_models_keep_thinking_enabled() -> None:

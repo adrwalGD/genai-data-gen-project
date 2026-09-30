@@ -184,3 +184,35 @@ def test_dispatch_explains_database_outage_and_empty_results() -> None:
 
     outcome = tools.dispatch("run_sql", {"sql": "SELECT 1"}, empty, None)
     assert outcome.error is None and "no rows" in outcome.response["note"]
+
+
+def test_parallel_tool_calls_are_answered_in_one_function_response_turn(sample_ddl: dict[str, str]) -> None:
+    from genai_data_gen_project.llm.client import FunctionCall
+
+    fake = FakeLLM(
+        tool_turns=[
+            ToolTurn(
+                text="",
+                calls=[
+                    FunctionCall("run_sql", {"sql": "SELECT count(*) AS n FROM customers"}),
+                    FunctionCall("run_sql", {"sql": "SELECT count(*) AS n FROM orders"}),
+                ],
+                content=None,
+            )
+        ],
+        final_text="60 and 60.",
+    )
+    seen: list[list[object]] = []
+    original = fake.generate_with_tools
+
+    def spy(contents, tools_, **kw):  # type: ignore[no-untyped-def]
+        seen.append(list(contents))
+        return original(contents, tools_, **kw)
+
+    fake.generate_with_tools = spy  # type: ignore[method-assign]
+    events = list(make_agent(sample_ddl, fake).ask("customers and orders?"))
+    assert [e.kind for e in events if e.kind == "tool_result"] == ["tool_result", "tool_result"]
+    assert events[-1].kind == "final"
+    last_turn = seen[1][-1]
+    assert len(seen[1]) == 2 and last_turn.role == "user"  # type: ignore[attr-defined]
+    assert [p.function_response.name for p in last_turn.parts] == ["run_sql", "run_sql"]  # type: ignore[attr-defined]

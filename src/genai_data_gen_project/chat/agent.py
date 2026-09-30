@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from ..config import Settings, get_settings
-from ..llm.client import LLMBackend, LLMError, function_response, model_content, user_content
+from ..llm.client import LLMBackend, LLMError, function_responses, model_content, user_content
 from ..observability import current_trace_id, flush, traced
 from ..schema.models import Schema
 from ..schema.summary import schema_summary
@@ -48,8 +48,9 @@ class Turn:
 SYSTEM_PROMPT = """You are a data analyst answering questions about ONE PostgreSQL dataset in plain language.
 Rules:
 - Never guess facts about the data: call run_sql and answer from its rows. Use exact lowercase table/column
-  names from the schema below; aggregate in SQL; add ORDER BY and LIMIT for top-N questions; never modify
-  data.
+  names from the schema below; aggregate in SQL; add ORDER BY and LIMIT for top-N questions (PostgreSQL
+  sorts NULLs first in DESC order, so write `DESC NULLS LAST`); compute percentages, shares and ratios in
+  SQL too — never do arithmetic on the rows yourself; never modify data.
 - If run_sql returns an error, read the hint and try a corrected query once or twice; then explain the
   problem.
 - When the user asks for a chart/plot/graph or a comparison that benefits from one, first run_sql for the
@@ -136,6 +137,7 @@ class Agent:
                     break
                 if reply.content is not None:
                     contents.append(reply.content)
+                responses: list[tuple[str, dict[str, Any]]] = []
                 for call in reply.calls:
                     yield AgentEvent("tool_call", tool=call.name, args=call.args)
                     with traced(f"tool.{call.name}", **_span_args(call.args)):
@@ -156,7 +158,8 @@ class Agent:
                         error=outcome.error,
                         text=outcome.error or "",
                     )
-                    contents.append(function_response(call.name, outcome.response))
+                    responses.append((call.name, outcome.response))
+                contents.append(function_responses(responses))
             else:
                 yield AgentEvent(
                     "error",
